@@ -9,12 +9,17 @@ function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+function generateId() {
+  return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+}
+
 interface ToolCall {
   name: string;
   arguments: any;
 }
 
 interface Message {
+  id: string;
   role: 'user' | 'assistant' | 'system';
   content: string;
   isStreaming?: boolean;
@@ -36,7 +41,8 @@ export default function ChatPanel({ onActiveSkillsChange, onTerminalUpdate }: Ch
     const saved = localStorage.getItem('lumina_chat_history');
     if (saved) {
       try {
-        setMessages(JSON.parse(saved));
+        const parsed = JSON.parse(saved);
+        setMessages(parsed.map((m: any) => m.id ? m : { ...m, id: generateId() }));
       } catch (e) {
         console.error('Failed to parse chat history', e);
       }
@@ -76,7 +82,7 @@ export default function ChatPanel({ onActiveSkillsChange, onTerminalUpdate }: Ch
     e.preventDefault();
     if (!input.trim() || isLoading) return;
 
-    const userMessage: Message = { role: 'user', content: input };
+    const userMessage: Message = { id: generateId(), role: 'user', content: input };
     setMessages(prev => [...prev, userMessage]);
     setInput('');
     setIsLoading(true);
@@ -86,6 +92,7 @@ export default function ChatPanel({ onActiveSkillsChange, onTerminalUpdate }: Ch
     } catch (error) {
       console.error('Chat error:', error);
       setMessages(prev => [...prev, {
+        id: generateId(),
         role: 'system',
         content: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`
       }]);
@@ -95,10 +102,17 @@ export default function ChatPanel({ onActiveSkillsChange, onTerminalUpdate }: Ch
   };
 
   const processTurn = async (newMessages: Message[]) => {
-    const currentHistory = [...messages.map(m => ({
-      role: m.role,
-      content: m.content
-    })), ...newMessages];
+    let currentHistory: any[] = [];
+    setMessages(prev => {
+      currentHistory = [...prev.map(m => ({
+        role: m.role,
+        content: m.content
+      })), ...newMessages.map(m => ({
+        role: m.role,
+        content: m.content
+      }))];
+      return prev;
+    });
 
     const response = await fetch('/api/chat', {
       method: 'POST',
@@ -113,10 +127,11 @@ export default function ChatPanel({ onActiveSkillsChange, onTerminalUpdate }: Ch
 
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
-    const assistantMessageIndex = messages.length + newMessages.length;
 
     // Crear el mensaje del asistente
+    const assistantMessageId = generateId();
     setMessages(prev => [...prev, {
+      id: assistantMessageId,
       role: 'assistant',
       content: '',
       isStreaming: true,
@@ -151,40 +166,19 @@ export default function ChatPanel({ onActiveSkillsChange, onTerminalUpdate }: Ch
               case 'token':
                 // Acumular tokens para mostrar streaming
                 fullContent += data.content;
-                setMessages(prev => {
-                  const updated = [...prev];
-                  if (updated[assistantMessageIndex]) {
-                    updated[assistantMessageIndex].content = fullContent;
-                  }
-                  return updated;
-                });
+                setMessages(prev => prev.map(m => m.id === assistantMessageId ? { ...m, content: fullContent } : m));
                 break;
 
               case 'parsed':
                 // Se recibió la respuesta parseada completa
                 parsedData = data.data;
                 // Actualizar con el contenido parseado formateado
-                setMessages(prev => {
-                  const updated = [...prev];
-                  if (updated[assistantMessageIndex]) {
-                    updated[assistantMessageIndex].content = JSON.stringify(parsedData);
-                  }
-                  return updated;
-                });
+                setMessages(prev => prev.map(m => m.id === assistantMessageId ? { ...m, content: JSON.stringify(parsedData) } : m));
                 break;
 
               case 'tool_start':
                 // Agregar tool call al mensaje
-                setMessages(prev => {
-                  const updated = [...prev];
-                  if (updated[assistantMessageIndex]) {
-                    updated[assistantMessageIndex].toolCalls = [
-                      ...(updated[assistantMessageIndex].toolCalls || []),
-                      data.toolCall
-                    ];
-                  }
-                  return updated;
-                });
+                setMessages(prev => prev.map(m => m.id === assistantMessageId ? { ...m, toolCalls: [...(m.toolCalls || []), data.toolCall] } : m));
                 break;
 
               case 'tool_result':
@@ -203,27 +197,12 @@ export default function ChatPanel({ onActiveSkillsChange, onTerminalUpdate }: Ch
                 }
 
                 // Agregar resultado al mensaje
-                setMessages(prev => {
-                  const updated = [...prev];
-                  if (updated[assistantMessageIndex]) {
-                    updated[assistantMessageIndex].toolResults = [
-                      ...(updated[assistantMessageIndex].toolResults || []),
-                      data.result
-                    ];
-                  }
-                  return updated;
-                });
+                setMessages(prev => prev.map(m => m.id === assistantMessageId ? { ...m, toolResults: [...(m.toolResults || []), data.result] } : m));
                 break;
 
               case 'error':
                 console.error('Stream error:', data.content);
-                setMessages(prev => {
-                  const updated = [...prev];
-                  if (updated[assistantMessageIndex]) {
-                    updated[assistantMessageIndex].content = `Error: ${data.content}`;
-                  }
-                  return updated;
-                });
+                setMessages(prev => prev.map(m => m.id === assistantMessageId ? { ...m, content: `Error: ${data.content}` } : m));
                 break;
 
               case 'skill_loaded':
@@ -240,17 +219,12 @@ export default function ChatPanel({ onActiveSkillsChange, onTerminalUpdate }: Ch
       }
 
       // Finalizar streaming
-      setMessages(prev => {
-        const updated = [...prev];
-        if (updated[assistantMessageIndex]) {
-          updated[assistantMessageIndex].isStreaming = false;
-        }
-        return updated;
-      });
+      setMessages(prev => prev.map(m => m.id === assistantMessageId ? { ...m, isStreaming: false } : m));
 
       // Si hay tool calls que ejecutar, procesar resultados
       if (turnToolResults.length > 0 && parsedData?.tool_calls?.length > 0) {
         const observationMessage: Message = {
+          id: generateId(),
           role: 'user',
           content: `Tool Execution Results:\n${JSON.stringify(turnToolResults, null, 2)}`
         };
@@ -258,14 +232,7 @@ export default function ChatPanel({ onActiveSkillsChange, onTerminalUpdate }: Ch
       }
     } catch (error) {
       console.error('Error processing stream:', error);
-      setMessages(prev => {
-        const updated = [...prev];
-        if (updated[assistantMessageIndex]) {
-          updated[assistantMessageIndex].content = `Error: ${error instanceof Error ? error.message : 'Unknown error'}`;
-          updated[assistantMessageIndex].isStreaming = false;
-        }
-        return updated;
-      });
+      setMessages(prev => prev.map(m => m.id === assistantMessageId ? { ...m, content: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`, isStreaming: false } : m));
     }
   };
 
@@ -388,8 +355,8 @@ export default function ChatPanel({ onActiveSkillsChange, onTerminalUpdate }: Ch
             <p className="text-sm font-medium text-zinc-500">Make, test, iterate...</p>
           </div>
         ) : (
-          messages.map((m, i) => (
-            <div key={i} className="animate-in fade-in-50 slide-in-from-bottom-2">
+          messages.map((m) => (
+            <div key={m.id} className="animate-in fade-in-50 slide-in-from-bottom-2">
               {renderMessageContent(m)}
             </div>
           ))

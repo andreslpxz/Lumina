@@ -64,13 +64,14 @@ export default function Home() {
           <div className="flex-1 relative bg-[#0c0c0e]">
             {previewUrl ? (
               <iframe
+                key="preview-iframe"
                 src={previewUrl}
                 className="w-full h-full border-none bg-white"
                 title="Preview"
                 sandbox="allow-same-origin allow-scripts allow-popups allow-forms"
               />
             ) : (
-              <div className="w-full h-full p-8 flex items-center justify-center">
+              <div key="preview-placeholder" className="w-full h-full p-8 flex items-center justify-center">
                 <div className="max-w-md w-full bg-[#161618] border border-zinc-800 rounded-2xl p-6 space-y-4 shadow-2xl">
                   <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-violet-600 to-fuchsia-600 flex items-center justify-center text-white font-bold text-2xl">
                     L
