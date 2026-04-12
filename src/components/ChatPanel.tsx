@@ -29,6 +29,27 @@ interface ChatPanelProps {
 
 export default function ChatPanel({ onActiveSkillsChange, onTerminalUpdate }: ChatPanelProps) {
   const [messages, setMessages] = useState<Message[]>([]);
+  const [isInitialized, setIsInitialized] = useState(false);
+
+  // Load from local storage on mount
+  useEffect(() => {
+    const saved = localStorage.getItem('lumina_chat_history');
+    if (saved) {
+      try {
+        setMessages(JSON.parse(saved));
+      } catch (e) {
+        console.error('Failed to parse chat history', e);
+      }
+    }
+    setIsInitialized(true);
+  }, []);
+
+  // Save to local storage when messages change
+  useEffect(() => {
+    if (isInitialized) {
+      localStorage.setItem('lumina_chat_history', JSON.stringify(messages));
+    }
+  }, [messages, isInitialized]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [activeSkills, setActiveSkills] = useState<string[]>([]);
