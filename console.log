@@ -1,0 +1,6 @@
+// Dentro del bucle while en ChatPanel.tsx
+const { done, value } = await reader.read();
+if (done) break;
+
+const chunk = decoder.decode(value, { stream: true });
+console.log("DEBUG CHUNK:", chunk); // <--- AÑADE ESTO

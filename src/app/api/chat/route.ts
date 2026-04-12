@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
 
         try {
           const completionStream = await groq.chat.completions.create({
-            model: process.env.MODEL_NAME || "llama3-70b-8192",
+            model: process.env.MODEL_NAME || "llama-3.3-70b-versatile",
             messages: conversation,
             stream: true,
             temperature: 0.2,
