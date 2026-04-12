@@ -31,65 +31,65 @@ export default function Home() {
       
       {/* Main Content Area */}
       <div className="flex-1 relative overflow-hidden bg-[#0a0a0a]">
-        {activeTab === 'chat' ? (
-          <div className="absolute inset-0 z-10">
-            <ChatPanel
-              onActiveSkillsChange={setActiveSkills}
-              onTerminalUpdate={() => {}} 
-            />
-          </div>
-        ) : (
-          <div className="absolute inset-0 flex flex-col">
-            {/* Preview Header */}
-            <header className="h-14 border-b border-zinc-800/50 bg-[#0a0a0a]/80 backdrop-blur-md flex items-center justify-between px-4 shrink-0 z-10">
-              <div className="flex items-center gap-4">
-                <div className="flex items-center gap-2 text-xs font-medium text-zinc-400">
-                  <Monitor size={18} className="text-zinc-500" />
-                  <span className="font-bold tracking-tight uppercase text-[10px]">Preview</span>
-                </div>
-                <div className="h-4 w-px bg-zinc-800" />
-                <div className="flex items-center gap-2 text-[11px] font-mono text-zinc-500">
-                  {previewUrl ? (
-                    <a href={previewUrl} target="_blank" rel="noopener noreferrer" className="hover:text-violet-400 transition-colors flex items-center gap-1">
-                      {previewUrl} <ExternalLink size={12} />
-                    </a>
-                  ) : (
-                    "Waiting for environment..."
-                  )}
-                </div>
-              </div>
-            </header>
 
-            {/* Preview Content */}
-            <div className="flex-1 relative bg-[#0c0c0e]">
-              {previewUrl ? (
-                <iframe
-                  src={previewUrl}
-                  className="w-full h-full border-none bg-white"
-                  title="Preview"
-                  sandbox="allow-same-origin allow-scripts allow-popups allow-forms"
-                />
-              ) : (
-                <div className="w-full h-full p-8 flex items-center justify-center">
-                  <div className="max-w-md w-full bg-[#161618] border border-zinc-800 rounded-2xl p-6 space-y-4 shadow-2xl">
-                    <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-violet-600 to-fuchsia-600 flex items-center justify-center text-white font-bold text-2xl">
-                      L
-                    </div>
-                    <div>
-                      <h3 className="text-lg font-bold text-zinc-200">Lumina Application</h3>
-                      <p className="text-sm text-zinc-500">Environment is initializing...</p>
-                    </div>
-                    <div className="pt-2">
-                      <div className="h-1.5 w-full bg-zinc-800 rounded-full overflow-hidden">
-                        <div className="h-full bg-violet-600 w-1/2 animate-pulse" />
-                      </div>
+        <div className={cn("absolute inset-0 z-10", activeTab === 'chat' ? 'block' : 'hidden')}>
+          <ChatPanel
+            onActiveSkillsChange={setActiveSkills}
+            onTerminalUpdate={() => {}}
+          />
+        </div>
+
+        <div className={cn("absolute inset-0 flex-col", activeTab === 'preview' ? 'flex' : 'hidden')}>
+          {/* Preview Header */}
+          <header className="h-14 border-b border-zinc-800/50 bg-[#0a0a0a]/80 backdrop-blur-md flex items-center justify-between px-4 shrink-0 z-10">
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2 text-xs font-medium text-zinc-400">
+                <Monitor size={18} className="text-zinc-500" />
+                <span className="font-bold tracking-tight uppercase text-[10px]">Preview</span>
+              </div>
+              <div className="h-4 w-px bg-zinc-800" />
+              <div className="flex items-center gap-2 text-[11px] font-mono text-zinc-500">
+                {previewUrl ? (
+                  <a href={previewUrl} target="_blank" rel="noopener noreferrer" className="hover:text-violet-400 transition-colors flex items-center gap-1">
+                    {previewUrl} <ExternalLink size={12} />
+                  </a>
+                ) : (
+                  "Waiting for environment..."
+                )}
+              </div>
+            </div>
+          </header>
+
+          {/* Preview Content */}
+          <div className="flex-1 relative bg-[#0c0c0e]">
+            {previewUrl ? (
+              <iframe
+                src={previewUrl}
+                className="w-full h-full border-none bg-white"
+                title="Preview"
+                sandbox="allow-same-origin allow-scripts allow-popups allow-forms"
+              />
+            ) : (
+              <div className="w-full h-full p-8 flex items-center justify-center">
+                <div className="max-w-md w-full bg-[#161618] border border-zinc-800 rounded-2xl p-6 space-y-4 shadow-2xl">
+                  <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-violet-600 to-fuchsia-600 flex items-center justify-center text-white font-bold text-2xl">
+                    L
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold text-zinc-200">Lumina Application</h3>
+                    <p className="text-sm text-zinc-500">Environment is initializing...</p>
+                  </div>
+                  <div className="pt-2">
+                    <div className="h-1.5 w-full bg-zinc-800 rounded-full overflow-hidden">
+                      <div className="h-full bg-violet-600 w-1/2 animate-pulse" />
                     </div>
                   </div>
                 </div>
-              )}
-            </div>
+              </div>
+            )}
           </div>
-        )}
+        </div>
+
       </div>
 
       {/* Bottom Navigation Bar */}

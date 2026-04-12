@@ -5,6 +5,7 @@ export type ToolCall = {
 
 export type AgentAction = {
   thought: string;
+  message?: string;
   tool_calls: ToolCall[];
 };
 
