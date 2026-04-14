@@ -1,0 +1,134 @@
+{
+  "project_name": "AI Coding Agent IDE",
+  "theme": "dark",
+  "archetype": "Archetype 4: Swiss & High-Contrast (Adapted for Developer Tools in Dark Mode)",
+  "vibe": "Professional, technical, precise, and highly functional command-center. Deep blacks, sharp borders.",
+  "typography": {
+    "headings": {
+      "family": "IBM Plex Sans, sans-serif",
+      "weight": "600",
+      "letter_spacing": "tracking-tight"
+    },
+    "body": {
+      "family": "Geist, sans-serif",
+      "weight": "400",
+      "letter_spacing": "tracking-normal"
+    },
+    "monospace": {
+      "family": "JetBrains Mono, monospace",
+      "weight": "400",
+      "usage": "Code blocks, tool call logs, file paths, IDs"
+    },
+    "hierarchy": {
+      "h1": "text-2xl font-semibold",
+      "h2": "text-xl font-medium",
+      "h3": "text-lg font-medium",
+      "body": "text-sm",
+      "small": "text-xs text-zinc-400 uppercase tracking-widest"
+    }
+  },
+  "colors": {
+    "background": "#09090B",
+    "surface": "#18181B",
+    "surface_hover": "#27272A",
+    "border": "#27272A",
+    "text_primary": "#FAFAFA",
+    "text_secondary": "#A1A1AA",
+    "text_muted": "#71717A",
+    "primary": {
+      "DEFAULT": "#3B82F6",
+      "hover": "#2563EB",
+      "foreground": "#FFFFFF"
+    },
+    "status": {
+      "success": "#10B981",
+      "warning": "#F59E0B",
+      "error": "#EF4444",
+      "running_glow": "rgba(59, 130, 246, 0.5)"
+    }
+  },
+  "layout_system": {
+    "grid": "Control Room Grid (Dense, sharp borders, high utility)",
+    "structure": {
+      "app_container": "h-screen w-full flex overflow-hidden bg-zinc-950 text-zinc-50",
+      "sidebar": "w-64 border-r border-zinc-800 flex flex-col hidden md:flex",
+      "chat_panel": "flex-1 md:max-w-md lg:max-w-lg border-r border-zinc-800 flex flex-col bg-zinc-950 relative",
+      "preview_panel": "flex-1 flex flex-col bg-zinc-900 overflow-hidden"
+    },
+    "spacing": {
+      "dense": "p-2 gap-2 (for sidebar items, tool calls)",
+      "standard": "p-4 gap-4 (for chat bubbles, input area)",
+      "generous": "p-8 (for empty states)"
+    },
+    "borders": {
+      "radius": "rounded-md (Keep it sharp, avoid heavily rounded pills)",
+      "style": "1px solid border-zinc-800"
+    }
+  },
+  "surface_strategies": {
+    "panels": "Grid Borders (Technical Look). Panels separated by 1px solid zinc-800. No shadows for main panels.",
+    "tool_calls": "Retro-Futurism/Terminal look. Deep black background (bg-black), 1px solid border, monospace text.",
+    "chat_input": "Floating above the chat area with a subtle dark gradient mask at the top to fade out scrolling text.",
+    "preview_browser": "Neumorphism/Tactile variant. Header of the preview panel resembles a minimal browser tab bar with URL input and refresh buttons."
+  },
+  "components_usage": {
+    "Button": "Shadcn Button. Use 'ghost' for sidebar/menu items. Use 'default' (blue) only for primary actions.",
+    "Input": "Shadcn Input. Must have focus-visible:ring-1 focus-visible:ring-blue-500. Chat textarea should auto-resize.",
+    "ScrollArea": "Shadcn ScrollArea for chat history and sidebar lists. Customize scrollbar to be very thin, dark gray.",
+    "Tabs": "Shadcn Tabs for the Preview Panel (Preview | Code | Console). Use underlined tabs rather than pill tabs for a more IDE-like feel.",
+    "Sheet": "Shadcn Sheet for mobile navigation (Hamburger menu). Slides in from the left containing the sidebar content.",
+    "Collapsible": "Shadcn Collapsible for Tool Calls. Header shows tool name and status (running/completed). Content shows raw JSON or console logs.",
+    "Badge": "For status indicators (e.g., 'Sandbox: Active', 'Model: Groq')."
+  },
+  "specific_features_design": {
+    "ai_chat": {
+      "user_message": "Aligned right or distinct background (bg-zinc-800). Max-width 85%.",
+      "ai_response": "Aligned left, transparent background. Uses markdown formatting.",
+      "streaming": "A subtle pulsing cursor at the end of the streaming text."
+    },
+    "tool_calls_display": {
+      "idle": "Gray border, text-zinc-400, icon: lucide-wrench",
+      "running": "Amber border or blue glow, spinning icon (lucide-loader-2), text 'Executing...'",
+      "completed": "Green check or subtle gray background, collapsible to see 'Input' and 'Output' in JetBrains Mono font."
+    },
+    "live_preview_panel": {
+      "browser_header": "bg-zinc-900 border-b border-zinc-800 p-2 flex items-center gap-2.",
+      "url_bar": "bg-zinc-950 rounded-md px-3 py-1 text-xs text-zinc-400 font-mono w-full max-w-sm truncate",
+      "iframe_container": "bg-white w-full h-full flex-1. Wrap in a container that handles loading states gracefully."
+    },
+    "chat_history_sidebar": {
+      "grouping": "Overlines (text-[10px] uppercase tracking-widest text-zinc-500 mb-2 mt-4).",
+      "items": "text-sm text-zinc-300 hover:bg-zinc-800 hover:text-white rounded-md p-2 flex items-center gap-2 cursor-pointer truncate."
+    },
+    "authentication": {
+      "layout": "Centered card on a dark gradient background.",
+      "form": "Minimal, dense inputs with a primary CTA button."
+    }
+  },
+  "motion_and_interactions": {
+    "hover_states": "All buttons and list items must have distinct hover states (e.g., hover:bg-zinc-800 hover:text-white transition-colors duration-200).",
+    "focus_states": "focus:ring-1 focus:ring-blue-500 focus:outline-none.",
+    "tool_animations": "Use framer-motion or simple CSS transitions for smooth height expansion when expanding tool call logs. Add `animate-pulse` to running tool indicators."
+  },
+  "icons_library": "lucide-react",
+  "accessibility": {
+    "contrast": "Ensure text-zinc-400 against bg-zinc-950 meets 4.5:1 ratio. If not, use zinc-300.",
+    "testing": "All interactive and key informational elements MUST include a `data-testid` attribute (e.g., `data-testid=\"chat-input-textarea\"`, `data-testid=\"new-chat-btn\"`, `data-testid=\"preview-iframe\"`)."
+  },
+  "media_urls": {
+    "logo_url": {
+      "url": "https://images.unsplash.com/photo-1724167954496-a5c4befea483?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA3MDB8MHwxfHNlYXJjaHwxfHxhYnN0cmFjdCUyMGdlb21ldHJ5JTIwbG9nbyUyMHdoaXRlfGVufDB8fHx8MTc3NjE0NzQ0M3ww&ixlib=rb-4.1.0&q=85",
+      "description": "A black and white abstract geometry logo for the app branding in the sidebar header.",
+      "category": "logo"
+    }
+  },
+  "instructions_to_main_agent": [
+    "Use Shadcn UI for all base components, but override the default rounding to `rounded-md` or `rounded-sm` for a sharper, more technical IDE feel.",
+    "Install `lucide-react` for icons.",
+    "Install `react-markdown` and `remark-gfm` for rendering AI responses, and configure `@tailwindcss/typography` with `prose-invert` for dark mode.",
+    "Ensure the layout is robust: The left panel (Chat) should flex-shrink, and the right panel (Preview) should flex-grow. The chat area MUST be scrollable while the input remains fixed at the bottom.",
+    "For the E2B sandbox preview, handle the iframe loading state gracefully (show a spinner or a 'Starting Sandbox...' overlay).",
+    "Tool calls must be visually distinct from conversational text. Use accordion/collapsible blocks with monospace font.",
+    "Since it's a 'hybrid_fullstack' app, make sure to wire up authentication (Login/Register screens) using a simple, centered card layout matching the dark theme."
+  ]
+}
