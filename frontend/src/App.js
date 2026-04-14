@@ -119,7 +119,7 @@ function MainApp() {
       {/* Main Content */}
       <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
         {/* Chat Panel */}
-        <div className={`flex-1 lg:max-w-lg xl:max-w-xl lg:border-r lg:border-zinc-800 ${activeTab === 'chat' ? '' : 'hidden lg:flex'} flex flex-col`}>
+        <div className={`flex-1 lg:max-w-lg xl:max-w-xl lg:border-r lg:border-zinc-800 ${activeTab === 'chat' ? '' : 'hidden lg:flex'} flex flex-col pb-16 lg:pb-0`}>
           <ChatPanel
             chatId={activeChat}
             messages={messages}
@@ -130,7 +130,7 @@ function MainApp() {
         </div>
 
         {/* Preview Panel */}
-        <div className={`flex-1 ${activeTab === 'preview' ? '' : 'hidden lg:flex'} flex flex-col`}>
+        <div className={`flex-1 ${activeTab === 'preview' ? '' : 'hidden lg:flex'} flex flex-col pb-16 lg:pb-0`}>
           <PreviewPanel
             previewUrl={previewUrl}
             isVisible={true}
@@ -140,11 +140,11 @@ function MainApp() {
       </div>
 
       {/* Mobile Bottom Tab Bar */}
-      <div className="fixed bottom-0 left-0 right-0 h-16 bg-bg border-t border-zinc-800 flex items-center justify-center gap-4 lg:hidden z-30 pb-safe">
+      <div className="fixed bottom-0 left-0 right-0 h-16 bg-bg border-t border-zinc-800 flex items-center justify-center gap-4 lg:hidden z-50 pb-safe" style={{pointerEvents: 'auto'}}>
         <button
           data-testid="tab-chat-btn"
           onClick={() => setActiveTab('chat')}
-          className={`flex flex-col items-center gap-1 px-8 py-2 rounded-md transition-all ${
+          className={`flex flex-col items-center gap-1 px-8 py-2 rounded-md transition-all relative z-50 ${
             activeTab === 'chat'
               ? 'bg-primary text-white'
               : 'text-zinc-500 hover:text-zinc-300'
@@ -156,7 +156,7 @@ function MainApp() {
         <button
           data-testid="tab-preview-btn"
           onClick={() => setActiveTab('preview')}
-          className={`flex flex-col items-center gap-1 px-8 py-2 rounded-md transition-all ${
+          className={`flex flex-col items-center gap-1 px-8 py-2 rounded-md transition-all relative z-50 ${
             activeTab === 'preview'
               ? 'bg-primary text-white'
               : 'text-zinc-500 hover:text-zinc-300'
