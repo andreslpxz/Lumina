@@ -6,6 +6,7 @@ import {
   ChevronDown, ChevronRight, CheckCircle2, AlertCircle,
   ArrowDown, Wrench, Globe, Menu
 } from 'lucide-react';
+import ContentRenderer, { detectContentType } from './ContentRenderer';
 
 const API = process.env.REACT_APP_BACKEND_URL;
 
@@ -69,7 +70,42 @@ function ToolCallBlock({ toolCall, result, isRunning }) {
   );
 }
 
-export default function ChatPanel({ chatId, messages, setMessages, onPreviewUrl, onToggleSidebar }) {
+function extractRenderableBlocks(text) {
+  if (!text) return null;
+  const codeBlockRegex = /```(?:html|svg|xml|csv|excel)?\n([\s\S]*?)```/g;
+  const parts = [];
+  let lastIndex = 0;
+  let match;
+  let hasRenderable = false;
+
+  while ((match = codeBlockRegex.exec(text)) !== null) {
+    const code = match[1].trim();
+    const type = detectContentType(code);
+    if (type) {
+      hasRenderable = true;
+      if (match.index > lastIndex) {
+        parts.push({ type: 'text', content: text.slice(lastIndex, match.index) });
+      }
+      parts.push({ type: 'renderable', content: code, renderType: type });
+      lastIndex = match.index + match[0].length;
+    }
+  }
+
+  if (!hasRenderable) {
+    const type = detectContentType(text);
+    if (type) {
+      return [{ type: 'renderable', content: text, renderType: type }];
+    }
+    return null;
+  }
+
+  if (lastIndex < text.length) {
+    parts.push({ type: 'text', content: text.slice(lastIndex) });
+  }
+  return parts;
+}
+
+export default function ChatPanel({ chatId, messages, setMessages, onToggleSidebar }) {
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [showScrollBtn, setShowScrollBtn] = useState(false);
@@ -162,7 +198,6 @@ export default function ChatPanel({ chatId, messages, setMessages, onPreviewUrl,
                 }));
                 break;
               case 'preview_url':
-                if (data.url) onPreviewUrl(data.url);
                 break;
               case 'error':
                 setMessages(prev => prev.map(m =>
@@ -217,6 +252,9 @@ export default function ChatPanel({ chatId, messages, setMessages, onPreviewUrl,
       try { return JSON.parse(msg.content); } catch { return null; }
     })();
 
+    const textContent = parsed?.message || (!parsed ? msg.content : null);
+    const renderableParts = !msg.isStreaming ? extractRenderableBlocks(textContent) : null;
+
     return (
       <div className="mb-6 animate-fade-in-up" key={msg.id}>
         {/* Thought */}
@@ -227,7 +265,19 @@ export default function ChatPanel({ chatId, messages, setMessages, onPreviewUrl,
         )}
 
         {/* Message content */}
-        {parsed?.message ? (
+        {renderableParts ? (
+          <div className="text-sm text-zinc-300 leading-relaxed">
+            {renderableParts.map((part, i) =>
+              part.type === 'renderable' ? (
+                <ContentRenderer key={i} code={part.content} type={part.renderType} />
+              ) : (
+                <div key={i} className="prose prose-invert prose-sm max-w-none">
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{part.content}</ReactMarkdown>
+                </div>
+              )
+            )}
+          </div>
+        ) : parsed?.message ? (
           <div className="text-sm text-zinc-300 leading-relaxed prose prose-invert prose-sm max-w-none">
             <ReactMarkdown remarkPlugins={[remarkGfm]}>{parsed.message}</ReactMarkdown>
           </div>
