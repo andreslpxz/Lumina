@@ -4,8 +4,7 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import AuthPage from './components/AuthPage';
 import Sidebar from './components/Sidebar';
 import ChatPanel from './components/ChatPanel';
-import PreviewPanel from './components/PreviewPanel';
-import { Loader2, Monitor, MessageSquare } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 
 const API = process.env.REACT_APP_BACKEND_URL;
 
@@ -14,9 +13,7 @@ function MainApp() {
   const [chats, setChats] = useState([]);
   const [activeChat, setActiveChat] = useState(null);
   const [messages, setMessages] = useState([]);
-  const [previewUrl, setPreviewUrl] = useState(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState('chat'); // mobile: 'chat' | 'preview'
 
   // Load chats
   const loadChats = useCallback(async () => {
@@ -34,10 +31,8 @@ function MainApp() {
   const loadChat = useCallback(async (chatId) => {
     setActiveChat(chatId);
     setMessages([]);
-    setPreviewUrl(null);
     try {
       const { data } = await axios.get(`${API}/api/chats/${chatId}`, { withCredentials: true });
-      // Convert stored messages to display format
       const displayMsgs = [];
       for (const m of (data.messages || [])) {
         if (m.role === 'user' && !m.content.startsWith('Tool Result (')) {
@@ -56,7 +51,6 @@ function MainApp() {
         }
       }
       setMessages(displayMsgs);
-      if (data.preview_url) setPreviewUrl(data.preview_url);
     } catch {}
   }, []);
 
@@ -67,7 +61,6 @@ function MainApp() {
       setChats(prev => [data, ...prev]);
       setActiveChat(data._id);
       setMessages([]);
-      setPreviewUrl(null);
       setSidebarOpen(false);
     } catch {}
   };
@@ -80,7 +73,6 @@ function MainApp() {
       if (activeChat === chatId) {
         setActiveChat(null);
         setMessages([]);
-        setPreviewUrl(null);
       }
     } catch {}
   };
@@ -117,54 +109,13 @@ function MainApp() {
       />
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
-        {/* Chat Panel */}
-        <div className={`flex-1 lg:max-w-lg xl:max-w-xl lg:border-r lg:border-zinc-800 ${activeTab === 'chat' ? '' : 'hidden lg:flex'} flex flex-col pb-16 lg:pb-0`}>
-          <ChatPanel
-            chatId={activeChat}
-            messages={messages}
-            setMessages={setMessages}
-            onPreviewUrl={setPreviewUrl}
-            onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
-          />
-        </div>
-
-        {/* Preview Panel */}
-        <div className={`flex-1 ${activeTab === 'preview' ? '' : 'hidden lg:flex'} flex flex-col pb-16 lg:pb-0`}>
-          <PreviewPanel
-            previewUrl={previewUrl}
-            isVisible={true}
-            onClose={() => setActiveTab('chat')}
-          />
-        </div>
-      </div>
-
-      {/* Mobile Bottom Tab Bar */}
-      <div className="fixed bottom-0 left-0 right-0 h-16 bg-bg border-t border-zinc-800 flex items-center justify-center gap-4 lg:hidden z-50 pb-safe" style={{pointerEvents: 'auto'}}>
-        <button
-          data-testid="tab-chat-btn"
-          onClick={() => setActiveTab('chat')}
-          className={`flex flex-col items-center gap-1 px-8 py-2 rounded-md transition-all relative z-50 ${
-            activeTab === 'chat'
-              ? 'bg-primary text-white'
-              : 'text-zinc-500 hover:text-zinc-300'
-          }`}
-        >
-          <MessageSquare size={20} />
-          <span className="text-[10px] font-medium uppercase tracking-widest">Chat</span>
-        </button>
-        <button
-          data-testid="tab-preview-btn"
-          onClick={() => setActiveTab('preview')}
-          className={`flex flex-col items-center gap-1 px-8 py-2 rounded-md transition-all relative z-50 ${
-            activeTab === 'preview'
-              ? 'bg-primary text-white'
-              : 'text-zinc-500 hover:text-zinc-300'
-          }`}
-        >
-          <Monitor size={20} />
-          <span className="text-[10px] font-medium uppercase tracking-widest">Preview</span>
-        </button>
+      <div className="flex-1 flex flex-col overflow-hidden">
+        <ChatPanel
+          chatId={activeChat}
+          messages={messages}
+          setMessages={setMessages}
+          onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
+        />
       </div>
     </div>
   );
