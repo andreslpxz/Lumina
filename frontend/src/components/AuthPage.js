@@ -31,7 +31,7 @@ export default function AuthPage() {
         await register(name, email, password);
       }
     } catch (err) {
-      setError(formatApiError(err.response?.data?.detail) || err.message);
+      setError(formatApiError(err.response?.data?.detail || err.message));
     } finally {
       setLoading(false);
     }

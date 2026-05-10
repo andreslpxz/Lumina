@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import {
   Plus, MessageSquare, Trash2, LogOut, Terminal, X
@@ -85,13 +85,13 @@ export default function Sidebar({ chats, activeChat, onSelectChat, onNewChat, on
                 </p>
                 {items.map(chat => (
                   <div
-                    key={chat._id}
-                    data-testid={`chat-item-${chat._id}`}
-                    onClick={() => { onSelectChat(chat._id); onClose(); }}
+                    key={chat.id}
+                    data-testid={`chat-item-${chat.id}`}
+                    onClick={() => { onSelectChat(chat.id); onClose(); }}
                     className={`
                       group flex items-center gap-2 px-3 py-2 rounded-md cursor-pointer text-sm truncate relative
                       transition-colors duration-150
-                      ${activeChat === chat._id
+                      ${activeChat === chat.id
                         ? 'bg-zinc-800 text-white'
                         : 'text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-200'
                       }
@@ -100,8 +100,8 @@ export default function Sidebar({ chats, activeChat, onSelectChat, onNewChat, on
                     <MessageSquare size={14} className="shrink-0 opacity-60" />
                     <span className="truncate flex-1">{chat.title || 'New Chat'}</span>
                     <button
-                      data-testid={`delete-chat-${chat._id}`}
-                      onClick={(e) => { e.stopPropagation(); onDeleteChat(chat._id); }}
+                      data-testid={`delete-chat-${chat.id}`}
+                      onClick={(e) => { e.stopPropagation(); onDeleteChat(chat.id); }}
                       className="opacity-0 group-hover:opacity-100 text-zinc-500 hover:text-red-400 transition-all shrink-0"
                     >
                       <Trash2 size={14} />

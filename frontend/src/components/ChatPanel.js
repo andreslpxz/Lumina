@@ -1,4 +1,5 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { useAuth } from '../contexts/AuthContext';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import {
@@ -106,11 +107,17 @@ function extractRenderableBlocks(text) {
 }
 
 export default function ChatPanel({ chatId, messages, setMessages, onToggleSidebar }) {
+  const { getAccessToken } = useAuth();
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [showScrollBtn, setShowScrollBtn] = useState(false);
   const containerRef = useRef(null);
   const endRef = useRef(null);
+
+  const authHeaders = useCallback(() => {
+    const token = getAccessToken();
+    return token ? { Authorization: `Bearer ${token}` } : {};
+  }, [getAccessToken]);
 
   const scrollToBottom = () => endRef.current?.scrollIntoView({ behavior: 'smooth' });
 
@@ -144,9 +151,8 @@ export default function ChatPanel({ chatId, messages, setMessages, onToggleSideb
     try {
       const response = await fetch(`${API}/api/chat`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
         body: JSON.stringify({ content: input, chat_id: chatId }),
-        credentials: 'include',
       });
 
       const reader = response.body.getReader();
