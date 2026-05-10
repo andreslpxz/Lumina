@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import axios from 'axios';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import AuthPage from './components/AuthPage';
 import Sidebar from './components/Sidebar';
@@ -9,19 +8,27 @@ import { Loader2 } from 'lucide-react';
 const API = process.env.REACT_APP_BACKEND_URL;
 
 function MainApp() {
-  const { user, loading } = useAuth();
+  const { user, loading, getAccessToken } = useAuth();
   const [chats, setChats] = useState([]);
   const [activeChat, setActiveChat] = useState(null);
   const [messages, setMessages] = useState([]);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
+  const authHeaders = useCallback(() => {
+    const token = getAccessToken();
+    return token ? { Authorization: `Bearer ${token}` } : {};
+  }, [getAccessToken]);
+
   // Load chats
   const loadChats = useCallback(async () => {
     try {
-      const { data } = await axios.get(`${API}/api/chats`, { withCredentials: true });
-      setChats(data);
+      const resp = await fetch(`${API}/api/chats`, { headers: authHeaders() });
+      if (resp.ok) {
+        const data = await resp.json();
+        setChats(data);
+      }
     } catch {}
-  }, []);
+  }, [authHeaders]);
 
   useEffect(() => {
     if (user) loadChats();
@@ -32,7 +39,9 @@ function MainApp() {
     setActiveChat(chatId);
     setMessages([]);
     try {
-      const { data } = await axios.get(`${API}/api/chats/${chatId}`, { withCredentials: true });
+      const resp = await fetch(`${API}/api/chats/${chatId}`, { headers: authHeaders() });
+      if (!resp.ok) return;
+      const data = await resp.json();
       const displayMsgs = [];
       for (const m of (data.messages || [])) {
         if (m.role === 'user' && !m.content.startsWith('Tool Result (')) {
@@ -52,14 +61,20 @@ function MainApp() {
       }
       setMessages(displayMsgs);
     } catch {}
-  }, []);
+  }, [authHeaders]);
 
   // Create new chat
   const createChat = async () => {
     try {
-      const { data } = await axios.post(`${API}/api/chats`, { title: 'New Chat' }, { withCredentials: true });
+      const resp = await fetch(`${API}/api/chats`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
+        body: JSON.stringify({ title: 'New Chat' }),
+      });
+      if (!resp.ok) return;
+      const data = await resp.json();
       setChats(prev => [data, ...prev]);
-      setActiveChat(data._id);
+      setActiveChat(data.id);
       setMessages([]);
       setSidebarOpen(false);
     } catch {}
@@ -68,8 +83,11 @@ function MainApp() {
   // Delete chat
   const deleteChat = async (chatId) => {
     try {
-      await axios.delete(`${API}/api/chats/${chatId}`, { withCredentials: true });
-      setChats(prev => prev.filter(c => c._id !== chatId));
+      await fetch(`${API}/api/chats/${chatId}`, {
+        method: 'DELETE',
+        headers: authHeaders(),
+      });
+      setChats(prev => prev.filter(c => c.id !== chatId));
       if (activeChat === chatId) {
         setActiveChat(null);
         setMessages([]);
