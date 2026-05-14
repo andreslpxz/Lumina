@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { Terminal, Eye, EyeOff, ArrowRight, Loader2 } from 'lucide-react';
+import { Eye, EyeOff, ArrowRight, Loader2 } from 'lucide-react';
 
 function formatApiError(detail) {
   if (detail == null) return "Something went wrong. Please try again.";
@@ -42,10 +42,8 @@ export default function AuthPage() {
       <div className="w-full max-w-md">
         {/* Logo */}
         <div className="flex items-center justify-center gap-3 mb-10">
-          <div className="w-10 h-10 rounded-md bg-primary flex items-center justify-center">
-            <Terminal size={22} className="text-white" />
-          </div>
-          <span className="text-2xl font-semibold tracking-tight text-zinc-100">Axon</span>
+          <img src="/lumina-logo.jpeg" alt="Lumina" className="w-10 h-10 rounded-md object-cover" />
+          <span className="text-2xl font-semibold tracking-tight text-zinc-100">Lumina</span>
         </div>
 
         {/* Card */}

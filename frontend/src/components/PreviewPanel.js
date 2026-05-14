@@ -82,7 +82,7 @@ export default function PreviewPanel({ previewUrl, isVisible, onClose }) {
               <div>
                 <h3 className="text-sm font-medium text-zinc-400">Live Preview</h3>
                 <p className="text-xs text-zinc-600 mt-1">
-                  Your app will appear here once Axon starts a development server in the sandbox
+                  Your app will appear here once Lumina starts a development server in the sandbox
                 </p>
               </div>
               <div className="flex items-center justify-center gap-2 text-[10px] text-zinc-700">

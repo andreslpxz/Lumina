@@ -5,7 +5,7 @@ import remarkGfm from 'remark-gfm';
 import {
   Send, Loader2, Terminal as TerminalIcon, Cpu,
   ChevronDown, ChevronRight, CheckCircle2, AlertCircle,
-  ArrowDown, Wrench, Globe, Menu
+  ArrowDown, Wrench, Globe, Menu, Search, Paperclip, X
 } from 'lucide-react';
 import ContentRenderer, { detectContentType } from './ContentRenderer';
 
@@ -111,8 +111,13 @@ export default function ChatPanel({ chatId, messages, setMessages, onToggleSideb
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [showScrollBtn, setShowScrollBtn] = useState(false);
+  const [attachedFile, setAttachedFile] = useState(null);
+  const [showSearch, setShowSearch] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
   const containerRef = useRef(null);
   const endRef = useRef(null);
+  const fileInputRef = useRef(null);
+  const textareaRef = useRef(null);
 
   const authHeaders = useCallback(() => {
     const token = getAccessToken();
@@ -129,13 +134,43 @@ export default function ChatPanel({ chatId, messages, setMessages, onToggleSideb
     setShowScrollBtn(scrollHeight - scrollTop - clientHeight > 100);
   };
 
+  const handleFileSelect = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      setAttachedFile({ name: file.name, size: file.size, type: file.type, content: ev.target.result });
+    };
+    if (file.type.startsWith('text/') || file.name.match(/\.(js|jsx|ts|tsx|py|json|md|css|html|xml|csv|yaml|yml|toml|sh|bash|sql|rb|go|rs|java|c|cpp|h|hpp)$/i)) {
+      reader.readAsText(file);
+    } else {
+      reader.readAsDataURL(file);
+    }
+    e.target.value = '';
+  };
+
+  const filteredMessages = showSearch && searchQuery.trim()
+    ? messages.filter(m => m.content?.toLowerCase().includes(searchQuery.toLowerCase()))
+    : messages;
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!input.trim() || isLoading || !chatId) return;
 
-    const userMsg = { id: Date.now(), role: 'user', content: input };
+    let messageContent = input;
+    if (attachedFile) {
+      const fileInfo = `[Attached file: ${attachedFile.name} (${attachedFile.type}, ${(attachedFile.size / 1024).toFixed(1)}KB)]`;
+      if (attachedFile.content && !attachedFile.content.startsWith('data:')) {
+        messageContent = `${fileInfo}\n\n--- File content ---\n${attachedFile.content}\n--- End of file ---\n\n${input}`;
+      } else {
+        messageContent = `${fileInfo}\n\n${input}`;
+      }
+    }
+
+    const userMsg = { id: Date.now(), role: 'user', content: input, attachedFile: attachedFile ? { name: attachedFile.name } : null };
     setMessages(prev => [...prev, userMsg]);
     setInput('');
+    setAttachedFile(null);
     setIsLoading(true);
 
     const assistantId = Date.now() + 1;
@@ -152,7 +187,7 @@ export default function ChatPanel({ chatId, messages, setMessages, onToggleSideb
       const response = await fetch(`${API}/api/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...authHeaders() },
-        body: JSON.stringify({ content: input, chat_id: chatId }),
+        body: JSON.stringify({ content: messageContent, chat_id: chatId }),
       });
 
       const reader = response.body.getReader();
@@ -238,6 +273,12 @@ export default function ChatPanel({ chatId, messages, setMessages, onToggleSideb
       return (
         <div className="flex justify-end mb-4 animate-fade-in-up" key={msg.id}>
           <div className="max-w-[85%] bg-zinc-800 text-zinc-200 px-4 py-3 rounded-md rounded-tr-none text-sm leading-relaxed border border-zinc-700/50">
+            {msg.attachedFile && (
+              <div className="flex items-center gap-1.5 text-xs text-blue-400 mb-1.5">
+                <Paperclip size={12} />
+                <span>{msg.attachedFile.name}</span>
+              </div>
+            )}
             {msg.content}
           </div>
         </div>
@@ -334,12 +375,18 @@ export default function ChatPanel({ chatId, messages, setMessages, onToggleSideb
           >
             <Menu size={20} />
           </button>
-          <div className="w-6 h-6 rounded-md bg-primary flex items-center justify-center">
-            <Cpu size={14} className="text-white" />
-          </div>
-          <span className="font-semibold text-zinc-200 tracking-tight text-sm">Axon Agent</span>
+          <img src="/lumina-logo.jpeg" alt="Lumina" className="w-7 h-7 rounded-md object-cover" />
+          <span className="font-semibold text-zinc-200 tracking-tight text-sm">Lumina</span>
         </div>
         <div className="flex items-center gap-2">
+          <button
+            data-testid="search-toggle-btn"
+            onClick={() => { setShowSearch(!showSearch); setSearchQuery(''); }}
+            className="text-zinc-400 hover:text-zinc-200 transition-colors p-1.5 rounded-md hover:bg-zinc-800"
+            title="Search messages"
+          >
+            <Search size={16} />
+          </button>
           <div className="px-2.5 py-1 rounded-md bg-emerald-900/30 border border-emerald-800/40 text-[10px] text-emerald-400 font-medium">
             Groq
           </div>
@@ -349,6 +396,28 @@ export default function ChatPanel({ chatId, messages, setMessages, onToggleSideb
         </div>
       </div>
 
+      {/* Search bar */}
+      {showSearch && (
+        <div className="flex items-center gap-2 px-4 py-2 border-b border-zinc-800 bg-surface animate-fade-in-up">
+          <Search size={14} className="text-zinc-500 shrink-0" />
+          <input
+            data-testid="search-input"
+            type="text"
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            placeholder="Search in conversation..."
+            className="flex-1 bg-transparent text-zinc-200 text-sm focus:outline-none placeholder-zinc-600"
+            autoFocus
+          />
+          <button
+            onClick={() => { setShowSearch(false); setSearchQuery(''); }}
+            className="text-zinc-500 hover:text-zinc-300 transition-colors p-0.5"
+          >
+            <X size={14} />
+          </button>
+        </div>
+      )}
+
       {/* Messages */}
       <div
         ref={containerRef}
@@ -357,12 +426,10 @@ export default function ChatPanel({ chatId, messages, setMessages, onToggleSideb
       >
         {!chatId ? (
           <div className="h-full flex flex-col items-center justify-center text-center space-y-4">
-            <div className="w-16 h-16 rounded-md bg-surface border border-zinc-800 flex items-center justify-center">
-              <TerminalIcon size={28} className="text-zinc-600" />
-            </div>
+            <img src="/lumina-logo.jpeg" alt="Lumina" className="w-16 h-16 rounded-md object-cover" />
             <div>
               <p className="text-sm font-medium text-zinc-400">Select or create a chat</p>
-              <p className="text-xs text-zinc-600 mt-1">Start building with Axon Agent</p>
+              <p className="text-xs text-zinc-600 mt-1">Start building with Lumina</p>
             </div>
           </div>
         ) : messages.length === 0 ? (
@@ -376,7 +443,7 @@ export default function ChatPanel({ chatId, messages, setMessages, onToggleSideb
             </div>
           </div>
         ) : (
-          messages.map(renderMessage)
+          filteredMessages.map(renderMessage)
         )}
         <div ref={endRef} />
       </div>
@@ -393,8 +460,22 @@ export default function ChatPanel({ chatId, messages, setMessages, onToggleSideb
 
       {/* Input */}
       <div className="p-3 border-t border-zinc-800 bg-bg">
+        {attachedFile && (
+          <div className="flex items-center gap-2 mb-2 px-3 py-2 bg-surface border border-zinc-800 rounded-md text-xs text-zinc-400 animate-fade-in-up">
+            <Paperclip size={12} className="text-blue-400 shrink-0" />
+            <span className="truncate flex-1 text-zinc-300">{attachedFile.name}</span>
+            <span className="text-zinc-600 shrink-0">{(attachedFile.size / 1024).toFixed(1)}KB</span>
+            <button
+              onClick={() => setAttachedFile(null)}
+              className="text-zinc-500 hover:text-zinc-300 transition-colors shrink-0"
+            >
+              <X size={12} />
+            </button>
+          </div>
+        )}
         <form onSubmit={handleSubmit} className="bg-surface border border-zinc-800 rounded-md p-3 focus-within:border-primary/50 transition-all">
           <textarea
+            ref={textareaRef}
             data-testid="chat-input-textarea"
             value={input}
             onChange={e => setInput(e.target.value)}
@@ -404,14 +485,33 @@ export default function ChatPanel({ chatId, messages, setMessages, onToggleSideb
                 handleSubmit(e);
               }
             }}
+            onClick={() => textareaRef.current?.focus()}
             placeholder={chatId ? "Describe what you want to build..." : "Select a chat first"}
             disabled={!chatId || isLoading}
             className="w-full bg-transparent text-zinc-200 text-sm resize-none focus:outline-none min-h-[40px] max-h-[120px] placeholder-zinc-600 disabled:opacity-50"
             rows={1}
+            style={{ fontSize: '16px' }}
           />
           <div className="flex items-center justify-between mt-2">
-            <div className="flex items-center gap-2 text-[10px] text-zinc-600">
-              <span>Shift+Enter for newline</span>
+            <div className="flex items-center gap-2">
+              <input
+                ref={fileInputRef}
+                type="file"
+                onChange={handleFileSelect}
+                className="hidden"
+                accept=".js,.jsx,.ts,.tsx,.py,.json,.md,.css,.html,.xml,.csv,.yaml,.yml,.toml,.sh,.sql,.rb,.go,.rs,.java,.c,.cpp,.h,.txt,.log,.env,.cfg,.ini,.pdf,.png,.jpg,.jpeg,.gif,.svg,.webp"
+              />
+              <button
+                data-testid="attach-file-btn"
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={!chatId || isLoading}
+                className="text-zinc-500 hover:text-zinc-300 transition-colors p-1 rounded hover:bg-zinc-800 disabled:opacity-30 disabled:cursor-not-allowed"
+                title="Attach file"
+              >
+                <Paperclip size={16} />
+              </button>
+              <span className="text-[10px] text-zinc-600 hidden sm:inline">Shift+Enter for newline</span>
             </div>
             <button
               data-testid="send-message-btn"
