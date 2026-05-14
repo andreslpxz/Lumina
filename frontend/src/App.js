@@ -114,7 +114,7 @@ function MainApp() {
   if (!user) return <AuthPage />;
 
   return (
-    <div className="h-screen w-full flex overflow-hidden bg-bg text-zinc-50" data-testid="main-app">
+    <div className="w-full flex overflow-hidden bg-bg text-zinc-50" data-testid="main-app" style={{ height: '100dvh' }}>
       {/* Sidebar */}
       <Sidebar
         chats={chats}
