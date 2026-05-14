@@ -20,7 +20,6 @@ html, body, #root {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   -webkit-tap-highlight-color: transparent;
-  touch-action: manipulation;
 }
 
 textarea, input, select, button {
@@ -28,10 +27,18 @@ textarea, input, select, button {
   -moz-appearance: none;
   appearance: none;
   touch-action: manipulation;
+  -webkit-user-select: text;
+  user-select: text;
 }
 
 textarea:focus, input:focus {
   outline: none;
+  caret-color: #FAFAFA;
+}
+
+textarea {
+  cursor: text;
+  -webkit-text-size-adjust: 100%;
 }
 
 ::-webkit-scrollbar {
