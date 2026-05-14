@@ -459,7 +459,7 @@ export default function ChatPanel({ chatId, messages, setMessages, onToggleSideb
       )}
 
       {/* Input */}
-      <div className="p-3 border-t border-zinc-800 bg-bg">
+      <div className="p-3 border-t border-zinc-800 bg-bg" style={{ paddingBottom: 'max(12px, env(safe-area-inset-bottom))' }}>
         {attachedFile && (
           <div className="flex items-center gap-2 mb-2 px-3 py-2 bg-surface border border-zinc-800 rounded-md text-xs text-zinc-400 animate-fade-in-up">
             <Paperclip size={12} className="text-blue-400 shrink-0" />
@@ -485,12 +485,16 @@ export default function ChatPanel({ chatId, messages, setMessages, onToggleSideb
                 handleSubmit(e);
               }
             }}
-            onClick={() => textareaRef.current?.focus()}
+            onTouchEnd={(e) => {
+              if (!chatId || isLoading) return;
+              e.stopPropagation();
+              setTimeout(() => textareaRef.current?.focus(), 0);
+            }}
             placeholder={chatId ? "Describe what you want to build..." : "Select a chat first"}
             disabled={!chatId || isLoading}
-            className="w-full bg-transparent text-zinc-200 text-sm resize-none focus:outline-none min-h-[40px] max-h-[120px] placeholder-zinc-600 disabled:opacity-50"
-            rows={1}
-            style={{ fontSize: '16px' }}
+            className="w-full bg-transparent text-zinc-200 resize-none focus:outline-none placeholder-zinc-600 disabled:opacity-50"
+            rows={2}
+            style={{ fontSize: '16px', lineHeight: '1.5', minHeight: '48px', maxHeight: '120px', WebkitAppearance: 'none', touchAction: 'manipulation', WebkitUserSelect: 'text', userSelect: 'text' }}
           />
           <div className="flex items-center justify-between mt-2">
             <div className="flex items-center gap-2">
