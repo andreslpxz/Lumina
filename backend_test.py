@@ -4,7 +4,7 @@ import json
 from datetime import datetime
 
 class AxonAgentAPITester:
-    def __init__(self, base_url="https://52667618-46e0-4dd9-aa0c-a20e03244385.preview.emergentagent.com"):
+    def __init__(self, base_url="http://localhost:8000"):
         self.base_url = base_url
         self.session = requests.Session()
         self.tests_run = 0
