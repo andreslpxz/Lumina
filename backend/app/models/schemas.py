@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, List
 
 from pydantic import BaseModel
 
@@ -21,3 +21,23 @@ class ChatCreateReq(BaseModel):
 class MessageReq(BaseModel):
     content: str
     chat_id: str
+
+
+# ── Skills ──────────────────────────────────────────────
+
+class SkillCreateReq(BaseModel):
+    name: str
+    description: Optional[str] = None
+    prompt: str
+    category: Optional[str] = "custom"
+    is_public: Optional[bool] = False
+    tags: Optional[List[str]] = []
+
+
+class SkillUpdateReq(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+    prompt: Optional[str] = None
+    category: Optional[str] = None
+    is_public: Optional[bool] = None
+    tags: Optional[List[str]] = None

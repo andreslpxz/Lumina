@@ -1,4 +1,5 @@
 import json
+import re
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, HTTPException, Depends
@@ -12,11 +13,43 @@ from app.services.tools import execute_tool_call
 
 router = APIRouter(prefix="/api", tags=["ai"])
 
+SKILL_REF_RE = re.compile(r"@([a-z0-9](?:[a-z0-9-]*[a-z0-9])?)", re.IGNORECASE)
+
+
+def _resolve_skill_prompts(content: str, user_id: str) -> str:
+    """Find @skill-slug references and prepend their prompts."""
+    slugs = SKILL_REF_RE.findall(content)
+    if not slugs:
+        return content
+
+    svc = get_service_client()
+    result = (
+        svc.table("skills")
+        .select("slug, name, prompt, usage_count")
+        .in_("slug", [s.lower() for s in slugs])
+        .or_(f"user_id.eq.{user_id},is_public.eq.true")
+        .execute()
+    )
+    if not result.data:
+        return content
+
+    skill_context = ""
+    for skill in result.data:
+        skill_context += (
+            f"\n[SKILL: {skill['name']}]\n{skill['prompt']}\n[/SKILL]\n"
+        )
+        svc.table("skills").update(
+            {"usage_count": (skill.get("usage_count") or 0) + 1}
+        ).eq("slug", skill["slug"]).execute()
+
+    cleaned = SKILL_REF_RE.sub("", content).strip()
+    return f"{skill_context}\nUser request: {cleaned}"
+
 
 @router.post("/chat")
 async def chat_message(body: MessageReq, user: dict = Depends(get_current_user)):
     chat_id = body.chat_id
-    content = body.content.strip()
+    raw_content = body.content.strip()
     svc = get_service_client()
 
     # Verify chat belongs to user
@@ -31,10 +64,13 @@ async def chat_message(body: MessageReq, user: dict = Depends(get_current_user))
     if not chat.data:
         raise HTTPException(status_code=404, detail="Chat not found")
 
-    # Save user message
+    # Save original user message (with @skill refs visible)
     svc.table("messages").insert(
-        {"chat_id": chat_id, "role": "user", "content": content}
+        {"chat_id": chat_id, "role": "user", "content": raw_content}
     ).execute()
+
+    # Resolve @skill references into actual prompts for the LLM
+    content = _resolve_skill_prompts(raw_content, user["id"])
 
     # Update chat timestamp
     svc.table("chats").update(
@@ -50,7 +86,7 @@ async def chat_message(body: MessageReq, user: dict = Depends(get_current_user))
         .execute()
     )
     if len(existing_msgs.data or []) <= 1:
-        title = content[:50] + ("..." if len(content) > 50 else "")
+        title = raw_content[:50] + ("..." if len(raw_content) > 50 else "")
         svc.table("chats").update({"title": title}).eq("id", chat_id).execute()
 
     # Build conversation from DB history
@@ -63,8 +99,11 @@ async def chat_message(body: MessageReq, user: dict = Depends(get_current_user))
     )
 
     conversation = [{"role": "system", "content": SYSTEM_PROMPT}]
-    for m in history.data or []:
-        conversation.append({"role": m["role"], "content": m["content"]})
+    for i, m in enumerate(history.data or []):
+        msg_content = m["content"]
+        if m["role"] == "user" and i == len(history.data) - 1:
+            msg_content = content
+        conversation.append({"role": m["role"], "content": msg_content})
 
     async def stream_response():
         import groq as groq_module

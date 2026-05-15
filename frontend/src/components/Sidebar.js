@@ -1,10 +1,10 @@
 import React from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import {
-  Plus, MessageSquare, Trash2, LogOut, X
+  Plus, MessageSquare, Trash2, LogOut, X, Zap
 } from 'lucide-react';
 
-export default function Sidebar({ chats, activeChat, onSelectChat, onNewChat, onDeleteChat, isOpen, onClose }) {
+export default function Sidebar({ chats, activeChat, onSelectChat, onNewChat, onDeleteChat, isOpen, onClose, onOpenSkills }) {
   const { user, logout } = useAuth();
 
   const groupChats = (chatList) => {
@@ -60,8 +60,8 @@ export default function Sidebar({ chats, activeChat, onSelectChat, onNewChat, on
           </button>
         </div>
 
-        {/* New Chat Button */}
-        <div className="p-3">
+        {/* New Chat + Skills Buttons */}
+        <div className="p-3 space-y-2">
           <button
             data-testid="new-chat-btn"
             onClick={onNewChat}
@@ -69,6 +69,14 @@ export default function Sidebar({ chats, activeChat, onSelectChat, onNewChat, on
           >
             <Plus size={16} />
             <span>New Chat</span>
+          </button>
+          <button
+            data-testid="skills-btn"
+            onClick={() => { onOpenSkills(); onClose(); }}
+            className="w-full flex items-center gap-2 px-3 py-2.5 bg-surface hover:bg-surface-hover border border-zinc-800 rounded-md text-sm text-zinc-300 hover:text-white transition-all"
+          >
+            <Zap size={16} className="text-primary" />
+            <span>Skills</span>
           </button>
         </div>
 

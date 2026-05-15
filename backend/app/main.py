@@ -2,9 +2,9 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import FRONTEND_URL
-from app.routers import auth, chats, ai
+from app.routers import auth, chats, ai, skills
 
-app = FastAPI(title="Axon Agent API")
+app = FastAPI(title="Lumina API")
 
 app.add_middleware(
     CORSMiddleware,
@@ -17,8 +17,9 @@ app.add_middleware(
 app.include_router(auth.router)
 app.include_router(chats.router)
 app.include_router(ai.router)
+app.include_router(skills.router)
 
 
 @app.get("/api/health")
 async def health():
-    return {"status": "ok", "service": "axon-agent"}
+    return {"status": "ok", "service": "lumina"}
