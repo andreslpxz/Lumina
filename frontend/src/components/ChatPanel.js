@@ -5,7 +5,7 @@ import remarkGfm from 'remark-gfm';
 import {
   Send, Loader2, Terminal as TerminalIcon, Cpu,
   ChevronDown, ChevronRight, CheckCircle2, AlertCircle,
-  ArrowDown, Wrench, Globe, Menu, Search, Paperclip, X
+  ArrowDown, Wrench, Globe, Menu, Search, Paperclip, X, Zap
 } from 'lucide-react';
 import ContentRenderer, { detectContentType } from './ContentRenderer';
 
@@ -106,7 +106,7 @@ function extractRenderableBlocks(text) {
   return parts;
 }
 
-export default function ChatPanel({ chatId, messages, setMessages, onToggleSidebar }) {
+export default function ChatPanel({ chatId, messages, setMessages, onToggleSidebar, onOpenSkills, skillInput, onSkillInputUsed }) {
   const { getAccessToken } = useAuth();
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -114,6 +114,9 @@ export default function ChatPanel({ chatId, messages, setMessages, onToggleSideb
   const [attachedFile, setAttachedFile] = useState(null);
   const [showSearch, setShowSearch] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [skillSuggestions, setSkillSuggestions] = useState([]);
+  const [showSkillSuggestions, setShowSkillSuggestions] = useState(false);
+  const [selectedSuggestionIdx, setSelectedSuggestionIdx] = useState(0);
   const containerRef = useRef(null);
   const endRef = useRef(null);
   const fileInputRef = useRef(null);
@@ -123,6 +126,32 @@ export default function ChatPanel({ chatId, messages, setMessages, onToggleSideb
     const token = getAccessToken();
     return token ? { Authorization: `Bearer ${token}` } : {};
   }, [getAccessToken]);
+
+  // Handle skill injection from SkillsPanel "Use in Chat"
+  useEffect(() => {
+    if (skillInput) {
+      setInput(prev => skillInput + prev);
+      onSkillInputUsed();
+      textareaRef.current?.focus();
+    }
+  }, [skillInput, onSkillInputUsed]);
+
+  // Fetch skill suggestions when user types @
+  const fetchSkillSuggestions = useCallback(async (query) => {
+    try {
+      const resp = await fetch(`${API}/api/skills/search?q=${encodeURIComponent(query)}`, {
+        headers: authHeaders(),
+      });
+      if (resp.ok) {
+        const data = await resp.json();
+        setSkillSuggestions(data);
+        setShowSkillSuggestions(data.length > 0);
+        setSelectedSuggestionIdx(0);
+      }
+    } catch {
+      setShowSkillSuggestions(false);
+    }
+  }, [authHeaders]);
 
   const scrollToBottom = () => endRef.current?.scrollIntoView({ behavior: 'smooth' });
 
@@ -153,10 +182,53 @@ export default function ChatPanel({ chatId, messages, setMessages, onToggleSideb
     ? messages.filter(m => m.content?.toLowerCase().includes(searchQuery.toLowerCase()))
     : messages;
 
+  const handleInputChange = (e) => {
+    const val = e.target.value;
+    setInput(val);
+
+    // Detect @ at the end or after a space for skill autocomplete
+    const cursorPos = e.target.selectionStart;
+    const textBeforeCursor = val.slice(0, cursorPos);
+    const atMatch = textBeforeCursor.match(/@([a-z0-9-]*)$/i);
+
+    if (atMatch) {
+      fetchSkillSuggestions(atMatch[1]);
+    } else {
+      setShowSkillSuggestions(false);
+    }
+  };
+
+  const insertSkillSuggestion = (skill) => {
+    const cursorPos = textareaRef.current?.selectionStart || input.length;
+    const textBeforeCursor = input.slice(0, cursorPos);
+    const textAfterCursor = input.slice(cursorPos);
+    const atIdx = textBeforeCursor.lastIndexOf('@');
+    if (atIdx >= 0) {
+      const newInput = textBeforeCursor.slice(0, atIdx) + `@${skill.slug} ` + textAfterCursor;
+      setInput(newInput);
+    }
+    setShowSkillSuggestions(false);
+    textareaRef.current?.focus();
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!input.trim() || isLoading || !chatId) return;
 
+    // Handle slash commands
+    const trimmed = input.trim().toLowerCase();
+    if (trimmed === '/skills') {
+      setInput('');
+      onOpenSkills?.();
+      return;
+    }
+    if (trimmed === '/createskill') {
+      setInput('');
+      onOpenSkills?.();
+      return;
+    }
+
+    setShowSkillSuggestions(false);
     let messageContent = input;
     if (attachedFile) {
       const fileInfo = `[Attached file: ${attachedFile.name} (${attachedFile.type}, ${(attachedFile.size / 1024).toFixed(1)}KB)]`;
@@ -473,7 +545,29 @@ export default function ChatPanel({ chatId, messages, setMessages, onToggleSideb
             </button>
           </div>
         )}
-        <form onSubmit={handleSubmit} className="bg-surface border border-zinc-800 rounded-md p-3 focus-within:border-primary/50 transition-all">
+        <form onSubmit={handleSubmit} className="bg-surface border border-zinc-800 rounded-md p-3 focus-within:border-primary/50 transition-all relative">
+          {/* Skill autocomplete suggestions */}
+          {showSkillSuggestions && skillSuggestions.length > 0 && (
+            <div className="absolute bottom-full left-0 right-0 mb-1 bg-surface border border-zinc-700 rounded-md shadow-xl overflow-hidden z-20 max-h-48 overflow-y-auto">
+              {skillSuggestions.map((skill, idx) => (
+                <button
+                  key={skill.slug}
+                  type="button"
+                  onClick={() => insertSkillSuggestion(skill)}
+                  className={`w-full flex items-center gap-2.5 px-3 py-2 text-left transition-colors ${
+                    idx === selectedSuggestionIdx ? 'bg-zinc-800' : 'hover:bg-zinc-800/50'
+                  }`}
+                >
+                  <Zap size={13} className="text-primary shrink-0" />
+                  <div className="min-w-0">
+                    <span className="text-xs font-medium text-zinc-200">@{skill.slug}</span>
+                    <span className="text-[10px] text-zinc-500 ml-2 truncate">{skill.name}</span>
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+
           <div
             onClick={() => {
               if (chatId && !isLoading && textareaRef.current) {
@@ -486,14 +580,35 @@ export default function ChatPanel({ chatId, messages, setMessages, onToggleSideb
               ref={textareaRef}
               data-testid="chat-input-textarea"
               value={input}
-              onChange={e => setInput(e.target.value)}
+              onChange={handleInputChange}
               onKeyDown={e => {
+                if (showSkillSuggestions && skillSuggestions.length > 0) {
+                  if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    setSelectedSuggestionIdx(i => Math.min(i + 1, skillSuggestions.length - 1));
+                    return;
+                  }
+                  if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    setSelectedSuggestionIdx(i => Math.max(i - 1, 0));
+                    return;
+                  }
+                  if (e.key === 'Tab' || (e.key === 'Enter' && !e.shiftKey)) {
+                    e.preventDefault();
+                    insertSkillSuggestion(skillSuggestions[selectedSuggestionIdx]);
+                    return;
+                  }
+                  if (e.key === 'Escape') {
+                    setShowSkillSuggestions(false);
+                    return;
+                  }
+                }
                 if (e.key === 'Enter' && !e.shiftKey) {
                   e.preventDefault();
                   handleSubmit(e);
                 }
               }}
-              placeholder={chatId ? "Describe what you want to build..." : "Select a chat first"}
+              placeholder={chatId ? "Describe what you want to build... (use @skill-name or /skills)" : "Select a chat first"}
               disabled={!chatId || isLoading}
               className="w-full bg-transparent text-zinc-200 resize-none focus:outline-none placeholder-zinc-600 disabled:opacity-50"
               rows={2}
@@ -519,7 +634,17 @@ export default function ChatPanel({ chatId, messages, setMessages, onToggleSideb
               >
                 <Paperclip size={16} />
               </button>
-              <span className="text-[10px] text-zinc-600 hidden sm:inline">Shift+Enter for newline</span>
+              <button
+                data-testid="skills-quick-btn"
+                type="button"
+                onClick={onOpenSkills}
+                disabled={!chatId}
+                className="text-zinc-500 hover:text-primary transition-colors p-1 rounded hover:bg-zinc-800 disabled:opacity-30 disabled:cursor-not-allowed"
+                title="Skills (@skill-name)"
+              >
+                <Zap size={16} />
+              </button>
+              <span className="text-[10px] text-zinc-600 hidden sm:inline">@skill or /skills</span>
             </div>
             <button
               data-testid="send-message-btn"

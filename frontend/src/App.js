@@ -3,6 +3,7 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import AuthPage from './components/AuthPage';
 import Sidebar from './components/Sidebar';
 import ChatPanel from './components/ChatPanel';
+import SkillsPanel from './components/SkillsPanel';
 import { Loader2 } from 'lucide-react';
 
 const API = process.env.REACT_APP_BACKEND_URL;
@@ -13,6 +14,8 @@ function MainApp() {
   const [activeChat, setActiveChat] = useState(null);
   const [messages, setMessages] = useState([]);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [skillsPanelOpen, setSkillsPanelOpen] = useState(false);
+  const [skillInput, setSkillInput] = useState('');
 
   const authHeaders = useCallback(() => {
     const token = getAccessToken();
@@ -124,6 +127,7 @@ function MainApp() {
         onDeleteChat={deleteChat}
         isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
+        onOpenSkills={() => setSkillsPanelOpen(true)}
       />
 
       {/* Main Content */}
@@ -133,8 +137,21 @@ function MainApp() {
           messages={messages}
           setMessages={setMessages}
           onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
+          onOpenSkills={() => setSkillsPanelOpen(true)}
+          skillInput={skillInput}
+          onSkillInputUsed={() => setSkillInput('')}
         />
       </div>
+
+      {/* Skills Panel */}
+      <SkillsPanel
+        isOpen={skillsPanelOpen}
+        onClose={() => setSkillsPanelOpen(false)}
+        onUseSkill={(skill) => {
+          setSkillInput(`@${skill.slug} `);
+          setSkillsPanelOpen(false);
+        }}
+      />
     </div>
   );
 }
