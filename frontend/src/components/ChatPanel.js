@@ -11,8 +11,8 @@ import ContentRenderer, { detectContentType } from './ContentRenderer';
 
 const API = process.env.REACT_APP_BACKEND_URL;
 
-function ToolCallBlock({ toolCall, result, isRunning }) {
-  const [expanded, setExpanded] = useState(false);
+function ToolCallBlock({ toolCall, result, isRunning, onAccept, onReject, isPendingApproval }) {
+  const [expanded, setExpanded] = useState(true); // Default to true for local execution visibility
   const name = toolCall?.name || 'unknown';
 
   const getIcon = () => {
@@ -55,6 +55,27 @@ function ToolCallBlock({ toolCall, result, isRunning }) {
         {!isRunning && result?.error && <AlertCircle size={13} className="text-red-500" />}
         {expanded ? <ChevronDown size={13} className="text-zinc-500" /> : <ChevronRight size={13} className="text-zinc-500" />}
       </button>
+      {isPendingApproval && (
+        <div className="px-3 py-2 bg-amber-900/10 border-t border-zinc-800 flex items-center justify-between">
+          <span className="text-[10px] text-amber-500 font-medium flex items-center gap-1">
+            <AlertCircle size={10} /> Approval required for local execution
+          </span>
+          <div className="flex gap-2">
+            <button
+              onClick={onReject}
+              className="px-2 py-0.5 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-400 text-[10px] transition-colors"
+            >
+              Reject
+            </button>
+            <button
+              onClick={onAccept}
+              className="px-2 py-0.5 rounded bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] transition-colors"
+            >
+              Accept
+            </button>
+          </div>
+        </div>
+      )}
       {expanded && result && (
         <div className="border-t border-zinc-800/50 px-3 py-2 max-h-48 overflow-y-auto">
           <pre className="text-[11px] font-mono text-zinc-500 whitespace-pre-wrap break-all">
@@ -211,7 +232,142 @@ export default function ChatPanel({ chatId, messages, setMessages, onToggleSideb
     textareaRef.current?.focus();
   };
 
-  const handleSubmit = async (e) => {
+
+  const handleExecuteTool = async (messageId, toolCall) => {
+    setMessages(prev => prev.map(m => {
+      if (m.id !== messageId) return m;
+      const updatedCalls = (m.toolCalls || []).map(tc =>
+        tc.name === toolCall.name && JSON.stringify(tc.arguments) === JSON.stringify(toolCall.arguments)
+          ? { ...tc, isRunning: true }
+          : tc
+      );
+      return { ...m, toolCalls: updatedCalls };
+    }));
+
+    try {
+      const response = await fetch(`${API}/api/execute_tool`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
+        body: JSON.stringify({ chat_id: chatId, tool_call: toolCall }),
+      });
+      const data = await response.json();
+
+      setMessages(prev => prev.map(m => {
+        if (m.id !== messageId) return m;
+        const updatedCalls = (m.toolCalls || []).map(tc =>
+          tc.name === toolCall.name && JSON.stringify(tc.arguments) === JSON.stringify(toolCall.arguments)
+            ? { ...tc, isRunning: false, result: data.result }
+            : tc
+        );
+        return { ...m, toolCalls: updatedCalls };
+      }));
+
+      // Automatically send result back to AI
+      const resultMessage = `Tool Result (${toolCall.name}): ${JSON.stringify(data.result).substring(0, 2000)}`;
+      triggerChatWithContent(resultMessage);
+
+    } catch (err) {
+      setMessages(prev => prev.map(m => {
+        if (m.id !== messageId) return m;
+        const updatedCalls = (m.toolCalls || []).map(tc =>
+          tc.name === toolCall.name && JSON.stringify(tc.arguments) === JSON.stringify(toolCall.arguments)
+            ? { ...tc, isRunning: false, result: { error: err.message } }
+            : tc
+        );
+        return { ...m, toolCalls: updatedCalls };
+      }));
+    }
+  };
+
+  const handleRejectTool = (messageId, toolCall) => {
+    setMessages(prev => prev.map(m => {
+      if (m.id !== messageId) return m;
+      const updatedCalls = (m.toolCalls || []).map(tc =>
+        tc.name === toolCall.name && JSON.stringify(tc.arguments) === JSON.stringify(toolCall.arguments)
+          ? { ...tc, result: { error: 'Rejected by user' } }
+          : tc
+      );
+      return { ...m, toolCalls: updatedCalls };
+    }));
+    triggerChatWithContent(`User rejected the execution of ${toolCall.name}`);
+  };
+
+  const triggerChatWithContent = async (content) => {
+    setIsLoading(true);
+    const assistantId = Date.now() + 2; // Unique ID
+    setMessages(prev => [...prev, {
+      id: assistantId,
+      role: 'assistant',
+      content: '',
+      isStreaming: true,
+      toolCalls: [],
+      toolResults: [],
+    }]);
+
+    try {
+      const response = await fetch(`${API}/api/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
+        body: JSON.stringify({ content: content, chat_id: chatId }),
+      });
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let fullContent = '';
+      let parsedData = null;
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        const chunk = decoder.decode(value, { stream: true });
+        const lines = chunk.split('\n');
+
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          let lineContent = line.startsWith('data: ') ? line.slice(6) : line;
+          try {
+            const data = JSON.parse(lineContent);
+            switch (data.type) {
+              case 'token':
+                fullContent += data.content;
+                setMessages(prev => prev.map(m =>
+                  m.id === assistantId ? { ...m, content: fullContent } : m
+                ));
+                break;
+              case 'parsed':
+                parsedData = data.data;
+                setMessages(prev => prev.map(m =>
+                  m.id === assistantId ? {
+                    ...m,
+                    parsedData: parsedData,
+                    content: fullContent,
+                    toolCalls: parsedData.tool_calls || []
+                  } : m
+                ));
+                break;
+              case 'error':
+                setMessages(prev => prev.map(m =>
+                  m.id === assistantId ? { ...m, content: `Error: ${data.content}`, isStreaming: false } : m
+                ));
+                break;
+              case 'done':
+                break;
+            }
+          } catch {}
+        }
+      }
+      setMessages(prev => prev.map(m =>
+        m.id === assistantId ? { ...m, isStreaming: false } : m
+      ));
+    } catch (err) {
+       console.error(err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+const handleSubmit = async (e) => {
     e.preventDefault();
     if (!input.trim() || isLoading || !chatId) return;
 
@@ -289,7 +445,12 @@ export default function ChatPanel({ chatId, messages, setMessages, onToggleSideb
               case 'parsed':
                 parsedData = data.data;
                 setMessages(prev => prev.map(m =>
-                  m.id === assistantId ? { ...m, parsedData: parsedData, content: fullContent } : m
+                  m.id === assistantId ? {
+                    ...m,
+                    parsedData: parsedData,
+                    content: fullContent,
+                    toolCalls: parsedData.tool_calls || []
+                  } : m
                 ));
                 break;
               case 'tool_start':
@@ -419,7 +580,15 @@ export default function ChatPanel({ chatId, messages, setMessages, onToggleSideb
         {msg.toolCalls && msg.toolCalls.length > 0 && (
           <div className="mt-3 space-y-1">
             {msg.toolCalls.map((tc, i) => (
-              <ToolCallBlock key={i} toolCall={tc} result={tc.result} isRunning={tc.isRunning} />
+              <ToolCallBlock
+                key={i}
+                toolCall={tc}
+                result={tc.result}
+                isRunning={tc.isRunning}
+                isPendingApproval={!tc.result && !tc.isRunning}
+                onAccept={() => handleExecuteTool(msg.id, tc)}
+                onReject={() => handleRejectTool(msg.id, tc)}
+              />
             ))}
           </div>
         )}
@@ -463,7 +632,7 @@ export default function ChatPanel({ chatId, messages, setMessages, onToggleSideb
             Groq
           </div>
           <div className="px-2.5 py-1 rounded-md bg-blue-900/30 border border-blue-800/40 text-[10px] text-blue-400 font-medium">
-            E2B
+            Local
           </div>
         </div>
       </div>

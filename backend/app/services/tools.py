@@ -16,12 +16,29 @@ async def execute_tool_call(tool_call: dict, chat_id: str) -> dict:
         sandbox = get_or_create_sandbox(chat_id)
         command = args.get("command", "")
         try:
+            # We use subprocess.Popen for background tasks if needed,
+            # but LocalSandbox.commands.run currently uses subprocess.run (blocking).
+            # If it's a background command (ends with &), we should handle it.
+            if command.strip().endswith("&"):
+                import subprocess
+                # Run in background
+                proc = subprocess.Popen(
+                    command,
+                    shell=True,
+                    cwd=sandbox.workspace_path,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True
+                )
+                return {"message": "Command started in background", "exitCode": 0}
+
             result = sandbox.commands.run(command)
             stdout = result.stdout or ""
             stderr = result.stderr or ""
             port = detect_port(stdout) or detect_port(stderr)
             if port:
-                preview_url = f"https://{sandbox.sandbox_id}-{port}.e2b.dev"
+                # In local mode, we point to localhost
+                preview_url = f"http://localhost:{port}"
                 svc = get_service_client()
                 svc.table("chats").update(
                     {
@@ -38,9 +55,6 @@ async def execute_tool_call(tool_call: dict, chat_id: str) -> dict:
         path = args.get("path", "")
         content = args.get("content", "")
         try:
-            dir_path = path.rsplit("/", 1)[0] if "/" in path else ""
-            if dir_path:
-                sandbox.commands.run(f"mkdir -p {dir_path}")
             sandbox.files.write(path, content)
             return {"success": True, "message": f"File written to {path}"}
         except Exception as e:

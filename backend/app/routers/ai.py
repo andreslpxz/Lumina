@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 
 from fastapi import APIRouter, HTTPException, Depends
 from fastapi.responses import StreamingResponse
+from pydantic import BaseModel
 
 from app.config import GROQ_API_KEY, MODEL_NAME
 from app.deps import get_current_user, get_service_client
@@ -15,6 +16,9 @@ router = APIRouter(prefix="/api", tags=["ai"])
 
 SKILL_REF_RE = re.compile(r"@([a-z0-9](?:[a-z0-9-]*[a-z0-9])?)", re.IGNORECASE)
 
+class ToolExecuteReq(BaseModel):
+    chat_id: str
+    tool_call: dict
 
 def _resolve_skill_prompts(content: str, user_id: str) -> str:
     """Find @skill-slug references and prepend their prompts."""
@@ -65,6 +69,9 @@ async def chat_message(body: MessageReq, user: dict = Depends(get_current_user))
         raise HTTPException(status_code=404, detail="Chat not found")
 
     # Save original user message (with @skill refs visible)
+    # Check if it's a tool result (prefixed or structured)
+    is_tool_result = raw_content.startswith("Tool Result")
+
     svc.table("messages").insert(
         {"chat_id": chat_id, "role": "user", "content": raw_content}
     ).execute()
@@ -144,33 +151,9 @@ async def chat_message(body: MessageReq, user: dict = Depends(get_current_user))
                 {"updated_at": datetime.now(timezone.utc).isoformat()}
             ).eq("id", chat_id).execute()
 
-            # Execute tool calls
-            tool_calls = parsed.get("tool_calls", [])
-            if tool_calls:
-                for tc in tool_calls:
-                    yield f"data: {json.dumps({'type': 'tool_start', 'toolCall': tc})}\n\n"
-                    result = await execute_tool_call(tc, chat_id)
-                    yield f"data: {json.dumps({'type': 'tool_result', 'toolCall': tc, 'result': result})}\n\n"
-
-                    # Save tool result as message
-                    svc.table("messages").insert(
-                        {
-                            "chat_id": chat_id,
-                            "role": "user",
-                            "content": f"Tool Result ({tc['name']}): {json.dumps(result)[:2000]}",
-                        }
-                    ).execute()
-
-            # Send preview URL if available
-            updated_chat = (
-                svc.table("chats")
-                .select("preview_url")
-                .eq("id", chat_id)
-                .single()
-                .execute()
-            )
-            if updated_chat.data and updated_chat.data.get("preview_url"):
-                yield f"data: {json.dumps({'type': 'preview_url', 'url': updated_chat.data['preview_url']})}\n\n"
+            # We NO LONGER execute tools automatically here.
+            # The frontend will receive 'parsed' which contains 'tool_calls'.
+            # It will ask the user for permission.
 
             yield f"data: {json.dumps({'type': 'done'})}\n\n"
 
@@ -178,3 +161,38 @@ async def chat_message(body: MessageReq, user: dict = Depends(get_current_user))
             yield f"data: {json.dumps({'type': 'error', 'content': str(e)})}\n\n"
 
     return StreamingResponse(stream_response(), media_type="text/event-stream")
+
+
+@router.post("/execute_tool")
+async def execute_tool(body: ToolExecuteReq, user: dict = Depends(get_current_user)):
+    chat_id = body.chat_id
+    tc = body.tool_call
+    svc = get_service_client()
+
+    # Verify chat belongs to user
+    chat = (
+        svc.table("chats")
+        .select("id")
+        .eq("id", chat_id)
+        .eq("user_id", user["id"])
+        .single()
+        .execute()
+    )
+    if not chat.data:
+        raise HTTPException(status_code=404, detail="Chat not found")
+
+    result = await execute_tool_call(tc, chat_id)
+
+    # Send preview URL if available after execution
+    preview_url = None
+    updated_chat = (
+        svc.table("chats")
+        .select("preview_url")
+        .eq("id", chat_id)
+        .single()
+        .execute()
+    )
+    if updated_chat.data:
+        preview_url = updated_chat.data.get("preview_url")
+
+    return {"result": result, "preview_url": preview_url}
