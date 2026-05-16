@@ -1,616 +1,188 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { useAuth } from '../contexts/AuthContext';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
+import React, { useState, useEffect, useRef } from 'react';
 import {
-  Send, Loader2, Terminal as TerminalIcon, Cpu,
-  ChevronDown, ChevronRight, CheckCircle2, AlertCircle,
-  ArrowDown, Wrench, Globe, Menu, Search, Paperclip, X, Zap
+  Send, Paperclip, Zap, Cpu, Search, X, Menu, Loader2, ArrowDown
 } from 'lucide-react';
-import ContentRenderer, { detectContentType } from './ContentRenderer';
+import ContentRenderer from './ContentRenderer';
 
 const API = process.env.REACT_APP_BACKEND_URL;
 
-function ToolCallBlock({ toolCall, result, isRunning, onAccept, onReject, isPendingApproval }) {
-  const [expanded, setExpanded] = useState(true); // Default to true for local execution visibility
-  const name = toolCall?.name || 'unknown';
-
-  const getIcon = () => {
-    if (name === 'run_command') return <TerminalIcon size={13} />;
-    if (name === 'write_file') return <Wrench size={13} />;
-    if (name === 'read_file') return <Wrench size={13} />;
-    if (name === 'search_web') return <Globe size={13} />;
-    return <Wrench size={13} />;
-  };
-
-  return (
-    <div
-      data-testid={`tool-call-${name}`}
-      className={`border rounded-md overflow-hidden mb-2 transition-colors ${
-        isRunning
-          ? 'border-blue-500/40 bg-blue-950/20'
-          : result?.error
-          ? 'border-red-800/40 bg-red-950/10'
-          : 'border-zinc-800 bg-black/30'
-      }`}
-    >
-      <button
-        onClick={() => setExpanded(!expanded)}
-        className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-zinc-800/30 transition-colors"
-      >
-        <span className={`${isRunning ? 'text-blue-400' : result?.error ? 'text-red-400' : 'text-emerald-400'}`}>
-          {isRunning ? <Loader2 size={13} className="animate-spin" /> : getIcon()}
-        </span>
-        <span className="font-mono text-xs text-zinc-400 flex-1 truncate">
-          {name}
-          {toolCall?.arguments?.command && (
-            <span className="text-zinc-600 ml-2">$ {toolCall.arguments.command.substring(0, 60)}</span>
-          )}
-          {toolCall?.arguments?.path && (
-            <span className="text-zinc-600 ml-2">{toolCall.arguments.path}</span>
-          )}
-        </span>
-        {isRunning && <span className="text-[10px] text-blue-400 animate-pulse">Running...</span>}
-        {!isRunning && result && !result.error && <CheckCircle2 size={13} className="text-emerald-500" />}
-        {!isRunning && result?.error && <AlertCircle size={13} className="text-red-500" />}
-        {expanded ? <ChevronDown size={13} className="text-zinc-500" /> : <ChevronRight size={13} className="text-zinc-500" />}
-      </button>
-      {isPendingApproval && (
-        <div className="px-3 py-2 bg-amber-900/10 border-t border-zinc-800 flex items-center justify-between">
-          <span className="text-[10px] text-amber-500 font-medium flex items-center gap-1">
-            <AlertCircle size={10} /> Approval required for local execution
-          </span>
-          <div className="flex gap-2">
-            <button
-              onClick={onReject}
-              className="px-2 py-0.5 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-400 text-[10px] transition-colors"
-            >
-              Reject
-            </button>
-            <button
-              onClick={onAccept}
-              className="px-2 py-0.5 rounded bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] transition-colors"
-            >
-              Accept
-            </button>
-          </div>
-        </div>
-      )}
-      {expanded && result && (
-        <div className="border-t border-zinc-800/50 px-3 py-2 max-h-48 overflow-y-auto">
-          <pre className="text-[11px] font-mono text-zinc-500 whitespace-pre-wrap break-all">
-            {result.stdout && <span className="text-zinc-400">{result.stdout.substring(0, 2000)}</span>}
-            {result.stderr && <span className="text-amber-500">{result.stderr.substring(0, 1000)}</span>}
-            {result.error && <span className="text-red-400">{result.error}</span>}
-            {result.content && <span className="text-zinc-400">{result.content.substring(0, 2000)}</span>}
-            {result.success && <span className="text-emerald-400">{result.message}</span>}
-            {result.answer && <span className="text-zinc-300">{result.answer}</span>}
-          </pre>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function extractRenderableBlocks(text) {
-  if (!text) return null;
-  const codeBlockRegex = /```(?:html|svg|xml|csv|excel)?\n([\s\S]*?)```/g;
-  const parts = [];
-  let lastIndex = 0;
-  let match;
-  let hasRenderable = false;
-
-  while ((match = codeBlockRegex.exec(text)) !== null) {
-    const code = match[1].trim();
-    const type = detectContentType(code);
-    if (type) {
-      hasRenderable = true;
-      if (match.index > lastIndex) {
-        parts.push({ type: 'text', content: text.slice(lastIndex, match.index) });
-      }
-      parts.push({ type: 'renderable', content: code, renderType: type });
-      lastIndex = match.index + match[0].length;
-    }
-  }
-
-  if (!hasRenderable) {
-    const type = detectContentType(text);
-    if (type) {
-      return [{ type: 'renderable', content: text, renderType: type }];
-    }
-    return null;
-  }
-
-  if (lastIndex < text.length) {
-    parts.push({ type: 'text', content: text.slice(lastIndex) });
-  }
-  return parts;
-}
-
-export default function ChatPanel({ chatId, messages, setMessages, onToggleSidebar, onOpenSkills, skillInput, onSkillInputUsed }) {
-  const { getAccessToken } = useAuth();
+export default function ChatPanel({
+  chatId,
+  messages,
+  setMessages,
+  onToggleSidebar,
+  onOpenSkills,
+  skillInput,
+  onSkillInputUsed
+}) {
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [showSearch, setShowSearch] = useState(false);
   const [showScrollBtn, setShowScrollBtn] = useState(false);
   const [attachedFile, setAttachedFile] = useState(null);
-  const [showSearch, setShowSearch] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [skillSuggestions, setSkillSuggestions] = useState([]);
+
+  // Skill autocomplete states
   const [showSkillSuggestions, setShowSkillSuggestions] = useState(false);
+  const [skillSuggestions, setSkillSuggestions] = useState([]);
   const [selectedSuggestionIdx, setSelectedSuggestionIdx] = useState(0);
-  const containerRef = useRef(null);
+
   const endRef = useRef(null);
-  const fileInputRef = useRef(null);
+  const containerRef = useRef(null);
   const textareaRef = useRef(null);
+  const fileInputRef = useRef(null);
 
-  const authHeaders = useCallback(() => {
-    const token = getAccessToken();
-    return token ? { Authorization: `Bearer ${token}` } : {};
-  }, [getAccessToken]);
-
-  // Handle skill injection from SkillsPanel "Use in Chat"
   useEffect(() => {
     if (skillInput) {
-      setInput(prev => skillInput + prev);
+      setInput(prev => prev + skillInput);
       onSkillInputUsed();
-      textareaRef.current?.focus();
+      if (textareaRef.current) textareaRef.current.focus();
     }
   }, [skillInput, onSkillInputUsed]);
 
-  // Fetch skill suggestions when user types @
-  const fetchSkillSuggestions = useCallback(async (query) => {
-    try {
-      const resp = await fetch(`${API}/api/skills/search?q=${encodeURIComponent(query)}`, {
-        headers: authHeaders(),
-      });
-      if (resp.ok) {
-        const data = await resp.json();
-        setSkillSuggestions(data);
-        setShowSkillSuggestions(data.length > 0);
-        setSelectedSuggestionIdx(0);
-      }
-    } catch {
-      setShowSkillSuggestions(false);
-    }
-  }, [authHeaders]);
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages]);
 
-  const scrollToBottom = () => endRef.current?.scrollIntoView({ behavior: 'smooth' });
-
-  useEffect(() => { scrollToBottom(); }, [messages]);
+  const scrollToBottom = () => {
+    endRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
 
   const handleScroll = () => {
     if (!containerRef.current) return;
     const { scrollTop, scrollHeight, clientHeight } = containerRef.current;
-    setShowScrollBtn(scrollHeight - scrollTop - clientHeight > 100);
+    setShowScrollBtn(scrollHeight - scrollTop - clientHeight > 300);
   };
-
-  const handleFileSelect = (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      setAttachedFile({ name: file.name, size: file.size, type: file.type, content: ev.target.result });
-    };
-    if (file.type.startsWith('text/') || file.name.match(/\.(js|jsx|ts|tsx|py|json|md|css|html|xml|csv|yaml|yml|toml|sh|bash|sql|rb|go|rs|java|c|cpp|h|hpp)$/i)) {
-      reader.readAsText(file);
-    } else {
-      reader.readAsDataURL(file);
-    }
-    e.target.value = '';
-  };
-
-  const filteredMessages = showSearch && searchQuery.trim()
-    ? messages.filter(m => m.content?.toLowerCase().includes(searchQuery.toLowerCase()))
-    : messages;
 
   const handleInputChange = (e) => {
     const val = e.target.value;
     setInput(val);
 
-    // Detect @ at the end or after a space for skill autocomplete
-    const cursorPos = e.target.selectionStart;
-    const textBeforeCursor = val.slice(0, cursorPos);
-    const atMatch = textBeforeCursor.match(/@([a-z0-9-]*)$/i);
-
-    if (atMatch) {
-      fetchSkillSuggestions(atMatch[1]);
+    // Skill autocomplete logic
+    const lastWordMatch = val.match(/@(\w*)$/);
+    if (lastWordMatch) {
+      const query = lastWordMatch[1].toLowerCase();
+      // Fetch skills from API
+      fetch(`${API}/api/skills/search?q=${query}`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem('sb-access-token')}` }
+      })
+      .then(r => r.json())
+      .then(data => {
+        setSkillSuggestions(data);
+        setShowSkillSuggestions(data.length > 0);
+        setSelectedSuggestionIdx(0);
+      })
+      .catch(() => setShowSkillSuggestions(false));
     } else {
       setShowSkillSuggestions(false);
     }
   };
 
   const insertSkillSuggestion = (skill) => {
-    const cursorPos = textareaRef.current?.selectionStart || input.length;
-    const textBeforeCursor = input.slice(0, cursorPos);
-    const textAfterCursor = input.slice(cursorPos);
-    const atIdx = textBeforeCursor.lastIndexOf('@');
-    if (atIdx >= 0) {
-      const newInput = textBeforeCursor.slice(0, atIdx) + `@${skill.slug} ` + textAfterCursor;
-      setInput(newInput);
-    }
+    const newVal = input.replace(/@\w*$/, `@${skill.slug} `);
+    setInput(newVal);
     setShowSkillSuggestions(false);
-    textareaRef.current?.focus();
+    if (textareaRef.current) textareaRef.current.focus();
   };
 
-
-  const handleExecuteTool = async (messageId, toolCall) => {
-    setMessages(prev => prev.map(m => {
-      if (m.id !== messageId) return m;
-      const updatedCalls = (m.toolCalls || []).map(tc =>
-        tc.name === toolCall.name && JSON.stringify(tc.arguments) === JSON.stringify(toolCall.arguments)
-          ? { ...tc, isRunning: true }
-          : tc
-      );
-      return { ...m, toolCalls: updatedCalls };
-    }));
-
-    try {
-      const response = await fetch(`${API}/api/execute_tool`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...authHeaders() },
-        body: JSON.stringify({ chat_id: chatId, tool_call: toolCall }),
-      });
-      const data = await response.json();
-
-      setMessages(prev => prev.map(m => {
-        if (m.id !== messageId) return m;
-        const updatedCalls = (m.toolCalls || []).map(tc =>
-          tc.name === toolCall.name && JSON.stringify(tc.arguments) === JSON.stringify(toolCall.arguments)
-            ? { ...tc, isRunning: false, result: data.result }
-            : tc
-        );
-        return { ...m, toolCalls: updatedCalls };
-      }));
-
-      // Automatically send result back to AI
-      const resultMessage = `Tool Result (${toolCall.name}): ${JSON.stringify(data.result).substring(0, 2000)}`;
-      triggerChatWithContent(resultMessage);
-
-    } catch (err) {
-      setMessages(prev => prev.map(m => {
-        if (m.id !== messageId) return m;
-        const updatedCalls = (m.toolCalls || []).map(tc =>
-          tc.name === toolCall.name && JSON.stringify(tc.arguments) === JSON.stringify(toolCall.arguments)
-            ? { ...tc, isRunning: false, result: { error: err.message } }
-            : tc
-        );
-        return { ...m, toolCalls: updatedCalls };
-      }));
-    }
+  const handleFileSelect = (e) => {
+    const file = e.target.files?.[0];
+    if (file) setAttachedFile(file);
+    e.target.value = '';
   };
 
-  const handleRejectTool = (messageId, toolCall) => {
-    setMessages(prev => prev.map(m => {
-      if (m.id !== messageId) return m;
-      const updatedCalls = (m.toolCalls || []).map(tc =>
-        tc.name === toolCall.name && JSON.stringify(tc.arguments) === JSON.stringify(toolCall.arguments)
-          ? { ...tc, result: { error: 'Rejected by user' } }
-          : tc
-      );
-      return { ...m, toolCalls: updatedCalls };
-    }));
-    triggerChatWithContent(`User rejected the execution of ${toolCall.name}`);
-  };
-
-  const triggerChatWithContent = async (content) => {
-    setIsLoading(true);
-    const assistantId = Date.now() + 2; // Unique ID
-    setMessages(prev => [...prev, {
-      id: assistantId,
-      role: 'assistant',
-      content: '',
-      isStreaming: true,
-      toolCalls: [],
-      toolResults: [],
-    }]);
-
-    try {
-      const response = await fetch(`${API}/api/chat`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...authHeaders() },
-        body: JSON.stringify({ content: content, chat_id: chatId }),
-      });
-
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let fullContent = '';
-      let parsedData = null;
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        const chunk = decoder.decode(value, { stream: true });
-        const lines = chunk.split('\n');
-
-        for (const line of lines) {
-          if (!line.trim()) continue;
-          let lineContent = line.startsWith('data: ') ? line.slice(6) : line;
-          try {
-            const data = JSON.parse(lineContent);
-            switch (data.type) {
-              case 'token':
-                fullContent += data.content;
-                setMessages(prev => prev.map(m =>
-                  m.id === assistantId ? { ...m, content: fullContent } : m
-                ));
-                break;
-              case 'parsed':
-                parsedData = data.data;
-                setMessages(prev => prev.map(m =>
-                  m.id === assistantId ? {
-                    ...m,
-                    parsedData: parsedData,
-                    content: fullContent,
-                    toolCalls: parsedData.tool_calls || []
-                  } : m
-                ));
-                break;
-              case 'error':
-                setMessages(prev => prev.map(m =>
-                  m.id === assistantId ? { ...m, content: `Error: ${data.content}`, isStreaming: false } : m
-                ));
-                break;
-              case 'done':
-                break;
-            }
-          } catch {}
-        }
-      }
-      setMessages(prev => prev.map(m =>
-        m.id === assistantId ? { ...m, isStreaming: false } : m
-      ));
-    } catch (err) {
-       console.error(err);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-const handleSubmit = async (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!input.trim() || isLoading || !chatId) return;
+    if (!input.trim() || !chatId || isLoading) return;
 
-    // Handle slash commands
-    const trimmed = input.trim().toLowerCase();
-    if (trimmed === '/skills') {
-      setInput('');
-      onOpenSkills?.();
-      return;
-    }
-    if (trimmed === '/createskill') {
-      setInput('');
-      onOpenSkills?.();
-      return;
-    }
-
-    setShowSkillSuggestions(false);
-    let messageContent = input;
-    if (attachedFile) {
-      const fileInfo = `[Attached file: ${attachedFile.name} (${attachedFile.type}, ${(attachedFile.size / 1024).toFixed(1)}KB)]`;
-      if (attachedFile.content && !attachedFile.content.startsWith('data:')) {
-        messageContent = `${fileInfo}\n\n--- File content ---\n${attachedFile.content}\n--- End of file ---\n\n${input}`;
-      } else {
-        messageContent = `${fileInfo}\n\n${input}`;
-      }
-    }
-
-    const userMsg = { id: Date.now(), role: 'user', content: input, attachedFile: attachedFile ? { name: attachedFile.name } : null };
-    setMessages(prev => [...prev, userMsg]);
+    const userMsg = input.trim();
     setInput('');
     setAttachedFile(null);
     setIsLoading(true);
 
-    const assistantId = Date.now() + 1;
-    setMessages(prev => [...prev, {
-      id: assistantId,
-      role: 'assistant',
-      content: '',
-      isStreaming: true,
-      toolCalls: [],
-      toolResults: [],
-    }]);
+    const msgId = Math.random();
+    setMessages(prev => [...prev, { id: msgId, role: 'user', content: userMsg }]);
 
     try {
-      const response = await fetch(`${API}/api/chat`, {
+      const resp = await fetch(`${API}/api/chat`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...authHeaders() },
-        body: JSON.stringify({ content: messageContent, chat_id: chatId }),
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${localStorage.getItem('sb-access-token')}`
+        },
+        body: JSON.stringify({ chat_id: chatId, content: userMsg }),
       });
 
-      const reader = response.body.getReader();
+      if (!resp.ok) throw new Error('Chat failed');
+
+      const reader = resp.body.getReader();
       const decoder = new TextDecoder();
-      let fullContent = '';
-      let parsedData = null;
+      let assistantMsg = {
+        id: Math.random(),
+        role: 'assistant',
+        content: '',
+        isStreaming: true,
+        toolCalls: []
+      };
+
+      setMessages(prev => [...prev, assistantMsg]);
 
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
 
-        const chunk = decoder.decode(value, { stream: true });
+        const chunk = decoder.decode(value);
         const lines = chunk.split('\n');
 
         for (const line of lines) {
-          if (!line.trim()) continue;
-          let content = line.startsWith('data: ') ? line.slice(6) : line;
-          try {
-            const data = JSON.parse(content);
-            switch (data.type) {
-              case 'token':
-                fullContent += data.content;
-                setMessages(prev => prev.map(m =>
-                  m.id === assistantId ? { ...m, content: fullContent } : m
-                ));
-                break;
-              case 'parsed':
-                parsedData = data.data;
-                setMessages(prev => prev.map(m =>
-                  m.id === assistantId ? {
-                    ...m,
-                    parsedData: parsedData,
-                    content: fullContent,
-                    toolCalls: parsedData.tool_calls || []
-                  } : m
-                ));
-                break;
-              case 'tool_start':
-                setMessages(prev => prev.map(m =>
-                  m.id === assistantId
-                    ? { ...m, toolCalls: [...(m.toolCalls || []), { ...data.toolCall, isRunning: true }] }
-                    : m
-                ));
-                break;
-              case 'tool_result':
-                setMessages(prev => prev.map(m => {
-                  if (m.id !== assistantId) return m;
-                  const updatedCalls = (m.toolCalls || []).map(tc =>
-                    tc.name === data.toolCall.name && tc.isRunning
-                      ? { ...tc, isRunning: false, result: data.result }
-                      : tc
-                  );
-                  return { ...m, toolCalls: updatedCalls };
-                }));
-                break;
-              case 'preview_url':
-                break;
-              case 'error':
-                setMessages(prev => prev.map(m =>
-                  m.id === assistantId ? { ...m, content: `Error: ${data.content}`, isStreaming: false } : m
-                ));
-                break;
-              case 'done':
-                break;
-              default:
-                break;
-            }
-          } catch {}
+          if (line.startsWith('data: ')) {
+            try {
+              const data = JSON.parse(line.slice(6));
+              if (data.type === 'token') {
+                assistantMsg.content += data.content;
+                setMessages(prev => prev.map(m => m.id === assistantMsg.id ? { ...assistantMsg } : m));
+              } else if (data.type === 'parsed') {
+                assistantMsg.parsedData = data.data;
+                setMessages(prev => prev.map(m => m.id === assistantMsg.id ? { ...assistantMsg } : m));
+              } else if (data.type === 'done') {
+                assistantMsg.isStreaming = false;
+                setMessages(prev => prev.map(m => m.id === assistantMsg.id ? { ...assistantMsg } : m));
+              }
+            } catch {}
+          }
         }
       }
-
-      setMessages(prev => prev.map(m =>
-        m.id === assistantId ? { ...m, isStreaming: false } : m
-      ));
     } catch (err) {
-      setMessages(prev => prev.map(m =>
-        m.id === assistantId
-          ? { ...m, content: `Error: ${err.message}`, isStreaming: false }
-          : m
-      ));
+      console.error(err);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const renderMessage = (msg) => {
-    if (msg.role === 'user') {
-      return (
-        <div className="flex justify-end mb-4 animate-fade-in-up" key={msg.id}>
-          <div className="max-w-[85%] bg-zinc-800 text-zinc-200 px-4 py-3 rounded-md rounded-tr-none text-sm leading-relaxed border border-zinc-700/50">
-            {msg.attachedFile && (
-              <div className="flex items-center gap-1.5 text-xs text-blue-400 mb-1.5">
-                <Paperclip size={12} />
-                <span>{msg.attachedFile.name}</span>
-              </div>
-            )}
-            {msg.content}
-          </div>
-        </div>
-      );
-    }
+  const filteredMessages = messages.filter(m =>
+    m.content.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
-    if (msg.role === 'system') {
-      return (
-        <div className="flex items-center gap-2 px-4 py-2 mb-4 bg-red-900/20 border border-red-800/30 rounded-md text-xs text-red-400 font-mono" key={msg.id}>
-          <AlertCircle size={14} />
-          {msg.content}
-        </div>
-      );
-    }
-
-    // Assistant message
-    const parsed = msg.parsedData || (() => {
-      try { return JSON.parse(msg.content); } catch { return null; }
-    })();
-
-    const textContent = parsed?.message || (!parsed ? msg.content : null);
-    const renderableParts = !msg.isStreaming ? extractRenderableBlocks(textContent) : null;
-
-    return (
-      <div className="mb-6 animate-fade-in-up" key={msg.id}>
-        {/* Thought */}
-        {parsed?.thought && (
-          <div className="text-[11px] text-zinc-600 italic border-l-2 border-zinc-800 pl-3 py-1 mb-3">
-            {parsed.thought}
-          </div>
-        )}
-
-        {/* Message content */}
-        {renderableParts ? (
-          <div className="text-sm text-zinc-300 leading-relaxed">
-            {renderableParts.map((part, i) =>
-              part.type === 'renderable' ? (
-                <ContentRenderer key={i} code={part.content} type={part.renderType} />
-              ) : (
-                <div key={i} className="prose prose-invert prose-sm max-w-none">
-                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{part.content}</ReactMarkdown>
-                </div>
-              )
-            )}
-          </div>
-        ) : parsed?.message ? (
-          <div className="text-sm text-zinc-300 leading-relaxed prose prose-invert prose-sm max-w-none">
-            <ReactMarkdown remarkPlugins={[remarkGfm]}>{parsed.message}</ReactMarkdown>
-          </div>
-        ) : !parsed && msg.content ? (
-          <div className="text-sm text-zinc-300 leading-relaxed">
-            {msg.isStreaming ? (
-              <span>
-                {msg.content}
-                <span className="inline-block w-1.5 h-4 bg-primary ml-0.5 animate-pulse-dot" />
-              </span>
-            ) : (
-              <div className="prose prose-invert prose-sm max-w-none">
-                <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
-              </div>
-            )}
-          </div>
-        ) : null}
-
-        {/* Tool calls */}
-        {msg.toolCalls && msg.toolCalls.length > 0 && (
-          <div className="mt-3 space-y-1">
-            {msg.toolCalls.map((tc, i) => (
-              <ToolCallBlock
-                key={i}
-                toolCall={tc}
-                result={tc.result}
-                isRunning={tc.isRunning}
-                isPendingApproval={!tc.result && !tc.isRunning}
-                onAccept={() => handleExecuteTool(msg.id, tc)}
-                onReject={() => handleRejectTool(msg.id, tc)}
-              />
-            ))}
-          </div>
-        )}
-
-        {/* Streaming indicator */}
-        {msg.isStreaming && !msg.content && (
-          <div className="flex items-center gap-2 text-zinc-500 text-xs">
-            <Loader2 size={14} className="animate-spin text-primary" />
-            <span>Thinking...</span>
-          </div>
-        )}
+  const renderMessage = (msg) => (
+    <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} mb-6`}>
+      <div className={`max-w-[85%] ${msg.role === 'user' ? 'bg-zinc-800' : 'bg-transparent'} rounded-lg p-3`}>
+        <ContentRenderer
+          content={msg.content}
+          role={msg.role}
+          parsedData={msg.parsedData}
+          isStreaming={msg.isStreaming}
+          chatId={chatId}
+        />
       </div>
-    );
-  };
+    </div>
+  );
 
   return (
-    <div className="flex flex-col h-full bg-bg" data-testid="chat-panel">
+    <div className="flex-1 flex flex-col bg-bg relative min-w-0 h-full">
       {/* Header */}
-      <div className="h-14 flex items-center justify-between px-4 border-b border-zinc-800 shrink-0">
+      <div className="h-14 flex items-center justify-between px-4 border-b border-zinc-800 bg-bg/80 backdrop-blur-md sticky top-0 z-20">
         <div className="flex items-center gap-3">
           <button
-            data-testid="hamburger-menu-btn"
             onClick={onToggleSidebar}
             className="md:hidden text-zinc-400 hover:text-zinc-200 transition-colors p-1"
           >
@@ -628,12 +200,6 @@ const handleSubmit = async (e) => {
           >
             <Search size={16} />
           </button>
-          <div className="px-2.5 py-1 rounded-md bg-emerald-900/30 border border-emerald-800/40 text-[10px] text-emerald-400 font-medium">
-            Groq
-          </div>
-          <div className="px-2.5 py-1 rounded-md bg-blue-900/30 border border-blue-800/40 text-[10px] text-blue-400 font-medium">
-            Local
-          </div>
         </div>
       </div>
 
@@ -703,7 +269,7 @@ const handleSubmit = async (e) => {
       <div className="p-3 border-t border-zinc-800 bg-bg" style={{ paddingBottom: 'max(12px, env(safe-area-inset-bottom))', position: 'relative', zIndex: 10 }}>
         {attachedFile && (
           <div className="flex items-center gap-2 mb-2 px-3 py-2 bg-surface border border-zinc-800 rounded-md text-xs text-zinc-400 animate-fade-in-up">
-            <Paperclip size={12} className="text-blue-400 shrink-0" />
+            <Zap size={12} className="text-blue-400 shrink-0" />
             <span className="truncate flex-1 text-zinc-300">{attachedFile.name}</span>
             <span className="text-zinc-600 shrink-0">{(attachedFile.size / 1024).toFixed(1)}KB</span>
             <button

@@ -4,6 +4,7 @@ import AuthPage from './components/AuthPage';
 import Sidebar from './components/Sidebar';
 import ChatPanel from './components/ChatPanel';
 import SkillsPanel from './components/SkillsPanel';
+import SettingsPanel from './components/SettingsPanel';
 import { Loader2 } from 'lucide-react';
 
 const API = process.env.REACT_APP_BACKEND_URL;
@@ -15,6 +16,7 @@ function MainApp() {
   const [messages, setMessages] = useState([]);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [skillsPanelOpen, setSkillsPanelOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [skillInput, setSkillInput] = useState('');
 
   const authHeaders = useCallback(() => {
@@ -41,6 +43,7 @@ function MainApp() {
   const loadChat = useCallback(async (chatId) => {
     setActiveChat(chatId);
     setMessages([]);
+    setSettingsOpen(false); // Close settings when switching chat
     try {
       const resp = await fetch(`${API}/api/chats/${chatId}`, { headers: authHeaders() });
       if (!resp.ok) return;
@@ -80,6 +83,7 @@ function MainApp() {
       setActiveChat(data.id);
       setMessages([]);
       setSidebarOpen(false);
+      setSettingsOpen(false);
     } catch {}
   };
 
@@ -128,22 +132,44 @@ function MainApp() {
         isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
         onOpenSkills={() => setSkillsPanelOpen(true)}
+        onOpenSettings={() => {
+          setSettingsOpen(true);
+          setSidebarOpen(false);
+        }}
       />
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col min-h-0">
-        <ChatPanel
-          chatId={activeChat}
-          messages={messages}
-          setMessages={setMessages}
-          onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
-          onOpenSkills={() => setSkillsPanelOpen(true)}
-          skillInput={skillInput}
-          onSkillInputUsed={() => setSkillInput('')}
-        />
+      <div className="flex-1 flex min-h-0">
+        <div className="flex-1 flex flex-col min-h-0">
+          <ChatPanel
+            chatId={activeChat}
+            messages={messages}
+            setMessages={setMessages}
+            onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
+            onOpenSkills={() => setSkillsPanelOpen(true)}
+            skillInput={skillInput}
+            onSkillInputUsed={() => setSkillInput('')}
+          />
+        </div>
+
+        {/* Settings Panel (replacing preview when open) */}
+        {settingsOpen ? (
+          <SettingsPanel
+            isOpen={settingsOpen}
+            onClose={() => setSettingsOpen(false)}
+          />
+        ) : (
+          <div className="hidden lg:flex flex-1 bg-zinc-900 border-l border-zinc-800 items-center justify-center text-zinc-600">
+             {/* This space is usually the PreviewPanel */}
+             <div className="text-center">
+                <p className="text-sm">Vista Previa / Skills</p>
+                <p className="text-[10px]">Abre ajustes para configurar el agente</p>
+             </div>
+          </div>
+        )}
       </div>
 
-      {/* Skills Panel */}
+      {/* Skills Panel (Modal-like) */}
       <SkillsPanel
         isOpen={skillsPanelOpen}
         onClose={() => setSkillsPanelOpen(false)}

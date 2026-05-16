@@ -1,10 +1,20 @@
 import React from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import {
-  Plus, MessageSquare, Trash2, LogOut, X, Zap
+  Plus, MessageSquare, Trash2, LogOut, X, Zap, Settings
 } from 'lucide-react';
 
-export default function Sidebar({ chats, activeChat, onSelectChat, onNewChat, onDeleteChat, isOpen, onClose, onOpenSkills }) {
+export default function Sidebar({
+  chats,
+  activeChat,
+  onSelectChat,
+  onNewChat,
+  onDeleteChat,
+  isOpen,
+  onClose,
+  onOpenSkills,
+  onOpenSettings
+}) {
   const { user, logout } = useAuth();
 
   const groupChats = (chatList) => {
@@ -136,14 +146,23 @@ export default function Sidebar({ chats, activeChat, onSelectChat, onNewChat, on
                 <p className="text-[10px] text-zinc-600 truncate">{user?.email}</p>
               </div>
             </div>
-            <button
-              data-testid="logout-btn"
-              onClick={logout}
-              className="text-zinc-500 hover:text-zinc-300 transition-colors p-1"
-              title="Logout"
-            >
-              <LogOut size={16} />
-            </button>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={onOpenSettings}
+                className="text-zinc-500 hover:text-zinc-300 transition-colors p-1 rounded-md hover:bg-zinc-800"
+                title="Ajustes"
+              >
+                <Settings size={16} />
+              </button>
+              <button
+                data-testid="logout-btn"
+                onClick={logout}
+                className="text-zinc-500 hover:text-zinc-300 transition-colors p-1 rounded-md hover:bg-zinc-800"
+                title="Logout"
+              >
+                <LogOut size={16} />
+              </button>
+            </div>
           </div>
         </div>
       </aside>
