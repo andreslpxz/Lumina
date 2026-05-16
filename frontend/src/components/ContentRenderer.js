@@ -5,6 +5,7 @@ import { Eye, Code, Copy, Check, Download, FileSpreadsheet } from 'lucide-react'
 import * as XLSX from 'xlsx';
 
 function detectContentType(code) {
+  if (!code) return null;
   const trimmed = code.trim();
   if (/^<!DOCTYPE\s+html/i.test(trimmed) || /^<html[\s>]/i.test(trimmed)) return 'html';
   if (/^<\?xml/i.test(trimmed)) return 'xml';
@@ -52,18 +53,18 @@ function CsvTable({ data }) {
   const body = rows.slice(1);
 
   return (
-    <div className="overflow-x-auto rounded-md border border-zinc-700">
+    <div className="overflow-x-auto rounded-md border border-zinc-700 dark:border-zinc-800">
       <table className="w-full text-xs text-left">
-        <thead className="bg-zinc-800 text-zinc-300">
+        <thead className="bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-300">
           <tr>
             {header.map((h, i) => (
-              <th key={i} className="px-3 py-2 font-medium border-b border-zinc-700 whitespace-nowrap">{h}</th>
+              <th key={i} className="px-3 py-2 font-medium border-b border-zinc-200 dark:border-zinc-700 whitespace-nowrap">{h}</th>
             ))}
           </tr>
         </thead>
-        <tbody className="text-zinc-400">
+        <tbody className="text-zinc-600 dark:text-zinc-400">
           {body.map((row, ri) => (
-            <tr key={ri} className="border-b border-zinc-800 hover:bg-zinc-800/50">
+            <tr key={ri} className="border-b border-zinc-100 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800/50">
               {row.map((cell, ci) => (
                 <td key={ci} className="px-3 py-1.5 whitespace-nowrap">{cell}</td>
               ))}
@@ -101,20 +102,20 @@ function ExcelRenderer({ code }) {
         <FileSpreadsheet size={12} />
         <span>Sheet: {tableData.sheetName}</span>
       </div>
-      <div className="overflow-x-auto rounded-md border border-zinc-700">
+      <div className="overflow-x-auto rounded-md border border-zinc-700 dark:border-zinc-800">
         <table className="w-full text-xs text-left">
-          <thead className="bg-zinc-800 text-zinc-300">
+          <thead className="bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-300">
             <tr>
               {header.map((h, i) => (
-                <th key={i} className="px-3 py-2 font-medium border-b border-zinc-700 whitespace-nowrap">
+                <th key={i} className="px-3 py-2 font-medium border-b border-zinc-200 dark:border-zinc-700 whitespace-nowrap">
                   {h != null ? String(h) : ''}
                 </th>
               ))}
             </tr>
           </thead>
-          <tbody className="text-zinc-400">
+          <tbody className="text-zinc-600 dark:text-zinc-400">
             {body.map((row, ri) => (
-              <tr key={ri} className="border-b border-zinc-800 hover:bg-zinc-800/50">
+              <tr key={ri} className="border-b border-zinc-100 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800/50">
                 {header.map((_, ci) => (
                   <td key={ci} className="px-3 py-1.5 whitespace-nowrap">
                     {row[ci] != null ? String(row[ci]) : ''}
@@ -146,7 +147,7 @@ function HtmlPreview({ code }) {
     <iframe
       srcDoc={srcDoc}
       title="HTML Preview"
-      className="w-full rounded-md border border-zinc-700 bg-white"
+      className="w-full rounded-md border border-zinc-200 dark:border-zinc-700 bg-white"
       style={{ minHeight: '300px', maxHeight: '600px' }}
       sandbox="allow-scripts allow-same-origin"
       onLoad={(e) => {
@@ -165,7 +166,7 @@ function HtmlPreview({ code }) {
 function SvgPreview({ code }) {
   return (
     <div
-      className="w-full rounded-md border border-zinc-700 bg-white p-4 overflow-auto"
+      className="w-full rounded-md border border-zinc-200 dark:border-zinc-700 bg-white p-4 overflow-auto"
       style={{ maxHeight: '500px' }}
       dangerouslySetInnerHTML={{ __html: code }}
     />
@@ -193,7 +194,7 @@ function XmlPreview({ code }) {
   }, [code]);
 
   return (
-    <div className="rounded-md border border-zinc-700 overflow-auto" style={{ maxHeight: '500px' }}>
+    <div className="rounded-md border border-zinc-200 dark:border-zinc-700 overflow-auto" style={{ maxHeight: '500px' }}>
       <SyntaxHighlighter
         language="xml"
         style={oneDark}
@@ -269,21 +270,21 @@ export default function ContentRenderer({ code, type: propType }) {
   const typeLabel = detectedType ? detectedType.toUpperCase() : 'CODE';
 
   return (
-    <div className="my-3 rounded-lg border border-zinc-700/60 bg-zinc-900/80 overflow-hidden">
+    <div className="my-3 rounded-xl border border-zinc-200 dark:border-zinc-700/60 bg-white dark:bg-zinc-900/80 overflow-hidden shadow-sm">
       {/* Toolbar */}
-      <div className="flex items-center justify-between px-3 py-2 bg-zinc-800/60 border-b border-zinc-700/40">
+      <div className="flex items-center justify-between px-3 py-2 bg-zinc-50 dark:bg-zinc-800/60 border-b border-zinc-200 dark:border-zinc-700/40">
         <div className="flex items-center gap-2">
-          <span className="text-[10px] font-mono font-medium text-zinc-400 bg-zinc-700/50 px-2 py-0.5 rounded">
+          <span className="text-[10px] font-mono font-medium text-zinc-500 dark:text-zinc-400 bg-zinc-200 dark:bg-zinc-700/50 px-2 py-0.5 rounded">
             {typeLabel}
           </span>
           {isRenderable && (
-            <div className="flex items-center bg-zinc-700/30 rounded-md overflow-hidden">
+            <div className="flex items-center bg-zinc-200 dark:bg-zinc-700/30 rounded-lg overflow-hidden p-0.5">
               <button
                 onClick={() => setMode('rendered')}
-                className={`flex items-center gap-1 px-2.5 py-1 text-[11px] font-medium transition-colors ${
+                className={`flex items-center gap-1 px-2.5 py-1 text-[11px] font-medium transition-colors rounded-md ${
                   mode === 'rendered'
-                    ? 'bg-primary text-white'
-                    : 'text-zinc-400 hover:text-zinc-200'
+                    ? 'bg-white dark:bg-primary text-primary dark:text-white shadow-sm'
+                    : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200'
                 }`}
               >
                 <Eye size={12} />
@@ -291,10 +292,10 @@ export default function ContentRenderer({ code, type: propType }) {
               </button>
               <button
                 onClick={() => setMode('code')}
-                className={`flex items-center gap-1 px-2.5 py-1 text-[11px] font-medium transition-colors ${
+                className={`flex items-center gap-1 px-2.5 py-1 text-[11px] font-medium transition-colors rounded-md ${
                   mode === 'code'
-                    ? 'bg-primary text-white'
-                    : 'text-zinc-400 hover:text-zinc-200'
+                    ? 'bg-white dark:bg-primary text-primary dark:text-white shadow-sm'
+                    : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200'
                 }`}
               >
                 <Code size={12} />
@@ -306,15 +307,15 @@ export default function ContentRenderer({ code, type: propType }) {
         <div className="flex items-center gap-1">
           <button
             onClick={handleCopy}
-            className="flex items-center gap-1 px-2 py-1 text-[11px] text-zinc-400 hover:text-zinc-200 transition-colors rounded hover:bg-zinc-700/50"
+            className="flex items-center gap-1 px-2 py-1 text-[11px] text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 transition-colors rounded hover:bg-zinc-200 dark:hover:bg-zinc-700/50"
             title="Copy code"
           >
-            {copied ? <Check size={12} className="text-emerald-400" /> : <Copy size={12} />}
+            {copied ? <Check size={12} className="text-emerald-500" /> : <Copy size={12} />}
             {copied ? 'Copied' : 'Copy'}
           </button>
           <button
             onClick={handleDownload}
-            className="flex items-center gap-1 px-2 py-1 text-[11px] text-zinc-400 hover:text-zinc-200 transition-colors rounded hover:bg-zinc-700/50"
+            className="flex items-center gap-1 px-2 py-1 text-[11px] text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 transition-colors rounded hover:bg-zinc-200 dark:hover:bg-zinc-700/50"
             title="Download file"
           >
             <Download size={12} />

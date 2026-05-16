@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { SettingsProvider } from './contexts/SettingsContext';
 import AuthPage from './components/AuthPage';
 import Sidebar from './components/Sidebar';
 import ChatPanel from './components/ChatPanel';
@@ -139,7 +140,7 @@ function MainApp() {
       />
 
       {/* Main Content */}
-      <div className="flex-1 flex min-h-0">
+      <div className="flex-1 flex min-h-0 relative">
         <div className="flex-1 flex flex-col min-h-0">
           <ChatPanel
             chatId={activeChat}
@@ -152,19 +153,23 @@ function MainApp() {
           />
         </div>
 
-        {/* Settings Panel (replacing preview when open) */}
-        {settingsOpen ? (
-          <SettingsPanel
-            isOpen={settingsOpen}
-            onClose={() => setSettingsOpen(false)}
-          />
-        ) : (
+        {/* Preview Space (Desktop) */}
+        {!settingsOpen && (
           <div className="hidden lg:flex flex-1 bg-zinc-900 border-l border-zinc-800 items-center justify-center text-zinc-600">
-             {/* This space is usually the PreviewPanel */}
              <div className="text-center">
                 <p className="text-sm">Vista Previa / Skills</p>
                 <p className="text-[10px]">Abre ajustes para configurar el agente</p>
              </div>
+          </div>
+        )}
+
+        {/* Settings Panel (Full Screen Overlay) */}
+        {settingsOpen && (
+          <div className="fixed inset-0 z-50 bg-bg">
+            <SettingsPanel
+              isOpen={settingsOpen}
+              onClose={() => setSettingsOpen(false)}
+            />
           </div>
         )}
       </div>
@@ -185,7 +190,9 @@ function MainApp() {
 function App() {
   return (
     <AuthProvider>
-      <MainApp />
+      <SettingsProvider>
+        <MainApp />
+      </SettingsProvider>
     </AuthProvider>
   );
 }

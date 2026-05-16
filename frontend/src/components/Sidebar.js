@@ -1,8 +1,6 @@
 import React from 'react';
-import { useAuth } from '../contexts/AuthContext';
-import {
-  Plus, MessageSquare, Trash2, LogOut, X, Zap, Settings
-} from 'lucide-react';
+import { Plus, MessageSquare, Trash2, Settings, Zap, X } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 export default function Sidebar({
   chats,
@@ -15,155 +13,92 @@ export default function Sidebar({
   onOpenSkills,
   onOpenSettings
 }) {
-  const { user, logout } = useAuth();
-
-  const groupChats = (chatList) => {
-    const now = new Date();
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const yesterday = new Date(today); yesterday.setDate(today.getDate() - 1);
-    const weekAgo = new Date(today); weekAgo.setDate(today.getDate() - 7);
-
-    const groups = { Today: [], Yesterday: [], 'This Week': [], Older: [] };
-    chatList.forEach(c => {
-      const d = new Date(c.updated_at || c.created_at);
-      if (d >= today) groups.Today.push(c);
-      else if (d >= yesterday) groups.Yesterday.push(c);
-      else if (d >= weekAgo) groups['This Week'].push(c);
-      else groups.Older.push(c);
-    });
-    return groups;
-  };
-
-  const groups = groupChats(chats);
-  
+  const { t } = useTranslation();
 
   return (
     <>
-      {/* Mobile overlay */}
+      {/* Mobile Overlay */}
       {isOpen && (
         <div
-          className="fixed inset-0 bg-black/60 z-40 md:hidden"
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 lg:hidden transition-opacity duration-300"
           onClick={onClose}
-          data-testid="sidebar-overlay"
         />
       )}
 
-      <aside
-        data-testid="sidebar"
-        className={`
-          fixed md:relative z-50 h-full w-72 bg-bg border-r border-zinc-800 flex flex-col
-          transition-transform duration-200 ease-out
-          ${isOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
-        `}
-      >
+      <aside className={`
+        fixed lg:static inset-y-0 left-0 z-50
+        w-72 bg-bg border-r border-zinc-800
+        transform transition-transform duration-300 ease-in-out
+        ${isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
+        flex flex-col
+      `}>
         {/* Header */}
-        <div className="h-14 flex items-center justify-between px-4 border-b border-zinc-800 shrink-0">
-          <div className="flex items-center gap-2.5">
-            <img src="/lumina-logo.jpeg" alt="Lumina" className="w-7 h-7 rounded-md object-cover" />
-            <span className="font-semibold text-zinc-200 tracking-tight text-sm">Lumina</span>
+        <div className="h-16 flex items-center justify-between px-4 border-b border-zinc-800 shrink-0">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
+               <Zap size={18} className="text-white fill-current" />
+            </div>
+            <span className="font-bold text-lg tracking-tight">Lumina</span>
           </div>
-          <button
-            onClick={onClose}
-            className="md:hidden text-zinc-500 hover:text-zinc-300 transition-colors p-1"
-          >
-            <X size={18} />
+          <button onClick={onClose} className="lg:hidden p-2 text-zinc-500 hover:text-white">
+            <X size={20} />
           </button>
         </div>
 
-        {/* New Chat + Skills Buttons */}
-        <div className="p-3 space-y-2">
+        {/* New Chat Button */}
+        <div className="p-4">
           <button
-            data-testid="new-chat-btn"
             onClick={onNewChat}
-            className="w-full flex items-center gap-2 px-3 py-2.5 bg-surface hover:bg-surface-hover border border-zinc-800 rounded-md text-sm text-zinc-300 hover:text-white transition-all"
+            className="w-full flex items-center justify-center gap-2 bg-zinc-800 hover:bg-zinc-700 text-white rounded-xl py-3 text-sm font-semibold transition-all border border-zinc-700/50"
           >
-            <Plus size={16} />
-            <span>New Chat</span>
-          </button>
-          <button
-            data-testid="skills-btn"
-            onClick={() => { onOpenSkills(); onClose(); }}
-            className="w-full flex items-center gap-2 px-3 py-2.5 bg-surface hover:bg-surface-hover border border-zinc-800 rounded-md text-sm text-zinc-300 hover:text-white transition-all"
-          >
-            <Zap size={16} className="text-primary" />
-            <span>Skills</span>
+            <Plus size={18} /> {t('new_chat')}
           </button>
         </div>
 
         {/* Chat List */}
-        <div className="flex-1 overflow-y-auto px-2 pb-2 scrollbar-hide">
-          {Object.entries(groups).map(([label, items]) => {
-            if (items.length === 0) return null;
-            return (
-              <div key={label} className="mb-2">
-                <p className="text-[10px] uppercase tracking-widest text-zinc-500 px-2 mb-1 mt-3 font-medium">
-                  {label}
-                </p>
-                {items.map(chat => (
-                  <div
-                    key={chat.id}
-                    data-testid={`chat-item-${chat.id}`}
-                    onClick={() => { onSelectChat(chat.id); onClose(); }}
-                    className={`
-                      group flex items-center gap-2 px-3 py-2 rounded-md cursor-pointer text-sm truncate relative
-                      transition-colors duration-150
-                      ${activeChat === chat.id
-                        ? 'bg-zinc-800 text-white'
-                        : 'text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-200'
-                      }
-                    `}
-                  >
-                    <MessageSquare size={14} className="shrink-0 opacity-60" />
-                    <span className="truncate flex-1">{chat.title || 'New Chat'}</span>
-                    <button
-                      data-testid={`delete-chat-${chat.id}`}
-                      onClick={(e) => { e.stopPropagation(); onDeleteChat(chat.id); }}
-                      className="opacity-0 group-hover:opacity-100 text-zinc-500 hover:text-red-400 transition-all shrink-0"
-                    >
-                      <Trash2 size={14} />
-                    </button>
-                  </div>
-                ))}
+        <div className="flex-1 overflow-y-auto px-3 space-y-1 scrollbar-hide">
+          {chats.map((chat) => (
+            <div
+              key={chat.id}
+              className={`
+                group flex items-center justify-between px-3 py-3 rounded-xl cursor-pointer transition-all
+                ${activeChat === chat.id
+                  ? 'bg-primary/10 text-primary border border-primary/20'
+                  : 'text-zinc-400 hover:bg-surface hover:text-zinc-200 border border-transparent'}
+              `}
+              onClick={() => onSelectChat(chat.id)}
+            >
+              <div className="flex items-center gap-3 min-w-0">
+                <MessageSquare size={16} className={activeChat === chat.id ? 'text-primary' : 'text-zinc-500'} />
+                <span className="text-sm font-medium truncate">{chat.title || 'Chat'}</span>
               </div>
-            );
-          })}
-          {chats.length === 0 && (
-            <div className="text-center text-zinc-600 text-xs mt-10 px-4">
-              No chats yet. Start a new conversation.
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDeleteChat(chat.id);
+                }}
+                className="opacity-0 group-hover:opacity-100 p-1.5 hover:bg-red-500/10 hover:text-red-400 rounded-lg transition-all"
+              >
+                <Trash2 size={14} />
+              </button>
             </div>
-          )}
+          ))}
         </div>
 
-        {/* User Info */}
-        <div className="border-t border-zinc-800 p-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2 min-w-0">
-              <div className="w-7 h-7 rounded-md bg-zinc-800 flex items-center justify-center text-xs font-semibold text-zinc-400 shrink-0">
-                {user?.name?.[0]?.toUpperCase() || 'U'}
-              </div>
-              <div className="min-w-0">
-                <p className="text-xs text-zinc-300 truncate">{user?.name || 'User'}</p>
-                <p className="text-[10px] text-zinc-600 truncate">{user?.email}</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-1">
-              <button
-                onClick={onOpenSettings}
-                className="text-zinc-500 hover:text-zinc-300 transition-colors p-1 rounded-md hover:bg-zinc-800"
-                title="Ajustes"
-              >
-                <Settings size={16} />
-              </button>
-              <button
-                data-testid="logout-btn"
-                onClick={logout}
-                className="text-zinc-500 hover:text-zinc-300 transition-colors p-1 rounded-md hover:bg-zinc-800"
-                title="Logout"
-              >
-                <LogOut size={16} />
-              </button>
-            </div>
-          </div>
+        {/* Footer Actions */}
+        <div className="p-4 mt-auto border-t border-zinc-800 space-y-2">
+          <button
+            onClick={onOpenSkills}
+            className="w-full flex items-center gap-3 px-4 py-3 text-zinc-400 hover:text-zinc-100 hover:bg-surface rounded-xl transition-all text-sm font-medium"
+          >
+            <Zap size={18} /> Skills
+          </button>
+          <button
+            onClick={onOpenSettings}
+            className="w-full flex items-center gap-3 px-4 py-3 text-zinc-400 hover:text-zinc-100 hover:bg-surface rounded-xl transition-all text-sm font-medium"
+          >
+            <Settings size={18} /> {t('settings')}
+          </button>
         </div>
       </aside>
     </>
