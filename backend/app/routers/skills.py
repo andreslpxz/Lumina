@@ -190,3 +190,36 @@ async def resolve_skills(
         ).eq("slug", skill["slug"]).execute()
 
     return result.data or []
+
+@router.post("/install")
+async def install_skill(body: dict, user: dict = Depends(get_current_user)):
+    url = body.get("url")
+    if not url:
+        raise HTTPException(status_code=400, detail="URL is required")
+
+    # Simple logic to simulate "installing" from skills.sh or github
+    # In a real app, we would fetch the metadata from the URL
+    import httpx
+    async with httpx.AsyncClient() as client:
+        try:
+            # If it's github, try to get the SKILL.md
+            if "github.com" in url:
+                raw_url = url.replace("github.com", "raw.githubusercontent.com").rstrip("/") + "/main/SKILL.md"
+                resp = await client.get(raw_url)
+                if resp.status_code == 200:
+                    content = resp.text
+                    # Extract name/description from frontmatter
+                    name_match = re.search(r"name:\s*(.*)", content)
+                    desc_match = re.search(r"description:\s*(.*)", content)
+                    name = name_match.group(1) if name_match else url.split("/")[-1]
+                    desc = desc_match.group(1) if desc_match else "Imported skill"
+                    prompt = content
+
+                    return await create_skill(
+                        SkillCreateReq(name=name, description=desc, prompt=prompt),
+                        user
+                    )
+        except Exception as e:
+             raise HTTPException(status_code=400, detail=f"Failed to fetch skill: {str(e)}")
+
+    raise HTTPException(status_code=400, detail="Could not install skill from this URL")

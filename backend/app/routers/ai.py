@@ -6,10 +6,9 @@ from fastapi import APIRouter, HTTPException, Depends
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
-from app.config import GROQ_API_KEY, MODEL_NAME
 from app.deps import get_current_user, get_service_client
 from app.models.schemas import MessageReq
-from app.services.ai_engine import SYSTEM_PROMPT
+from app.services.ai_engine import SYSTEM_PROMPT, get_completion_stream
 from app.services.tools import execute_tool_call
 
 router = APIRouter(prefix="/api", tags=["ai"])
@@ -56,6 +55,16 @@ async def chat_message(body: MessageReq, user: dict = Depends(get_current_user))
     raw_content = body.content.strip()
     svc = get_service_client()
 
+    # Get User Settings
+    profile = svc.table("profiles").select("settings").eq("id", user["id"]).single().execute()
+    settings = profile.data.get("settings", {}) if profile.data else {}
+
+    provider = settings.get("provider", "groq")
+    model = settings.get("model", "llama-3.3-70b-versatile")
+    temperature = settings.get("temperature", 0.7)
+    top_p = settings.get("top_p", 0.9)
+    max_tokens = settings.get("max_tokens", 4096)
+
     # Verify chat belongs to user
     chat = (
         svc.table("chats")
@@ -67,10 +76,6 @@ async def chat_message(body: MessageReq, user: dict = Depends(get_current_user))
     )
     if not chat.data:
         raise HTTPException(status_code=404, detail="Chat not found")
-
-    # Save original user message (with @skill refs visible)
-    # Check if it's a tool result (prefixed or structured)
-    is_tool_result = raw_content.startswith("Tool Result")
 
     svc.table("messages").insert(
         {"chat_id": chat_id, "role": "user", "content": raw_content}
@@ -113,31 +118,29 @@ async def chat_message(body: MessageReq, user: dict = Depends(get_current_user))
         conversation.append({"role": m["role"], "content": msg_content})
 
     async def stream_response():
-        import groq as groq_module
-
-        groq_client = groq_module.Groq(api_key=GROQ_API_KEY)
-
         try:
-            completion = groq_client.chat.completions.create(
-                model=MODEL_NAME,
-                messages=conversation,
-                stream=True,
-                temperature=0.2,
-                response_format={"type": "json_object"},
-            )
-
             full_content = ""
-            for chunk in completion:
-                token = chunk.choices[0].delta.content or ""
-                if token:
-                    full_content += token
-                    yield f"data: {json.dumps({'type': 'token', 'content': token})}\n\n"
+            async for chunk in get_completion_stream(
+                messages=conversation,
+                provider=provider,
+                model=model,
+                temperature=temperature,
+                top_p=top_p,
+                max_tokens=max_tokens
+            ):
+                full_content += chunk
+                yield f"data: {json.dumps({'type': 'token', 'content': chunk})}\n\n"
 
             # Parse JSON response
             try:
-                parsed = json.loads(full_content)
+                # Basic cleanup in case of non-strict providers
+                json_match = re.search(r'\{.*\}', full_content, re.DOTALL)
+                if json_match:
+                    parsed = json.loads(json_match.group())
+                else:
+                    parsed = json.loads(full_content)
             except json.JSONDecodeError:
-                yield f"data: {json.dumps({'type': 'error', 'content': 'Failed to parse LLM response'})}\n\n"
+                yield f"data: {json.dumps({'type': 'error', 'content': 'Failed to parse LLM response as JSON'})}\n\n"
                 return
 
             yield f"data: {json.dumps({'type': 'parsed', 'data': parsed})}\n\n"
@@ -150,10 +153,6 @@ async def chat_message(body: MessageReq, user: dict = Depends(get_current_user))
             svc.table("chats").update(
                 {"updated_at": datetime.now(timezone.utc).isoformat()}
             ).eq("id", chat_id).execute()
-
-            # We NO LONGER execute tools automatically here.
-            # The frontend will receive 'parsed' which contains 'tool_calls'.
-            # It will ask the user for permission.
 
             yield f"data: {json.dumps({'type': 'done'})}\n\n"
 

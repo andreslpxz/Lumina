@@ -109,3 +109,34 @@ async def refresh_token_endpoint(body: dict):
         raise
     except Exception as exc:
         raise HTTPException(status_code=401, detail=f"Refresh failed: {exc}")
+
+@router.patch("/settings")
+async def update_settings(body: dict, user: dict = Depends(get_current_user)):
+    svc = get_service_client()
+    result = svc.table("profiles").update({"settings": body}).eq("id", user["id"]).execute()
+    if not result.data:
+        raise HTTPException(status_code=400, detail="Update failed")
+    return {"status": "success", "settings": body}
+
+@router.get("/settings")
+async def get_settings(user: dict = Depends(get_current_user)):
+    svc = get_service_client()
+    result = svc.table("profiles").select("settings").eq("id", user["id"]).single().execute()
+    if not result.data:
+        # Return defaults if not set (though we added a default to the table)
+        return {
+            "provider": "groq",
+            "model": "llama-3.3-70b-versatile",
+            "temperature": 0.7,
+            "top_p": 0.9,
+            "max_tokens": 4096,
+            "theme": "dark",
+            "language": "es",
+            "enter_to_send": true,
+            "skills": {
+                "internet": true,
+                "sandbox": true,
+                "files": true
+            }
+        }
+    return result.data.get("settings", {})
